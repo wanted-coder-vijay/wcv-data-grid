@@ -561,4 +561,10 @@ PRs welcome. Please keep the prop API additive — feature toggles over breaking
 
 ## License
 
-[MIT](./LICENSE) · Copyright © wanted-coder-vijay
+[Apache-2.0](./LICENSE) · Copyright © 2026 vijay kumar anchupogu (wanted-coder-vijay)
+
+See [NOTICE](./NOTICE) for attribution requirements.
+
+> Versions `0.1.0` was published under MIT. `0.1.1` and later are
+> released under Apache-2.0. The earlier MIT-licensed code remains
+> available to anyone who installed it before the relicense.
