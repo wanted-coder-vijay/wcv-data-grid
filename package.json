@@ -6,11 +6,11 @@
   "author": "wanted-coder-vijay <drop.at.vijay@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wanted-coder-vijay/data-grid.git"
+    "url": "git+https://github.com/wanted-coder-vijay/wcv-data-grid.git"
   },
-  "homepage": "https://github.com/wanted-coder-vijay/data-grid#readme",
+  "homepage": "https://github.com/wanted-coder-vijay/wcv-data-grid#readme",
   "bugs": {
-    "url": "https://github.com/wanted-coder-vijay/data-grid/issues"
+    "url": "https://github.com/wanted-coder-vijay/wcv-data-grid/issues"
   },
   "publishConfig": {
     "access": "public"
