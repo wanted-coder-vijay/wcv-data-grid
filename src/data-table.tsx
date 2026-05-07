@@ -643,20 +643,36 @@ export function DataTable<TData extends { id: string | number }>({
   })
 
   // ----- column drag-and-drop reordering --------------------------------
+  // The grip icon is the drag SOURCE (it carries `draggable`); the entire
+  // <th> is the drop ZONE. Putting onDragOver/onDrop on the small grip span
+  // only — as we used to — meant the browser rejected the drop unless the
+  // cursor landed precisely on a 12px target, which felt broken.
   const dragState = useRef<{ src: string | null }>({ src: null })
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null)
 
   const onHeaderDragStart = (id: string, e: React.DragEvent) => {
     dragState.current.src = id
     e.dataTransfer.effectAllowed = "move"
     e.dataTransfer.setData("text/plain", id)
   }
-  const onHeaderDragOver = (e: React.DragEvent) => {
+  const onHeaderDragOver = (targetId: string) => (e: React.DragEvent) => {
+    if (!dragState.current.src) return
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
+    if (dragOverColId !== targetId) setDragOverColId(targetId)
   }
-  const onHeaderDrop = (targetId: string) => {
+  const onHeaderDragLeave = (targetId: string) => () => {
+    if (dragOverColId === targetId) setDragOverColId(null)
+  }
+  const onHeaderDragEnd = () => {
+    dragState.current.src = null
+    setDragOverColId(null)
+  }
+  const onHeaderDrop = (targetId: string) => (e: React.DragEvent) => {
+    e.preventDefault()
     const src = dragState.current.src
     dragState.current.src = null
+    setDragOverColId(null)
     if (!src || src === targetId) return
     setColumnOrder((order) => {
       const next = [...order]
@@ -759,6 +775,9 @@ export function DataTable<TData extends { id: string | number }>({
                     header.column.id === "__expand" ||
                     header.column.id === "__actions"
                   const isPinned = !!header.column.getIsPinned()
+                  const canReorder = !isUtility && f.reordering
+                  const isDropTarget =
+                    canReorder && dragOverColId === header.column.id
                   return (
                     <th
                       key={header.id}
@@ -768,19 +787,29 @@ export function DataTable<TData extends { id: string | number }>({
                         ...getPinningStyles(header.column),
                         ...(isPinned ? { zIndex: 2 } : {}),
                       }}
+                      onDragOver={
+                        canReorder ? onHeaderDragOver(header.column.id) : undefined
+                      }
+                      onDragLeave={
+                        canReorder ? onHeaderDragLeave(header.column.id) : undefined
+                      }
+                      onDrop={
+                        canReorder ? onHeaderDrop(header.column.id) : undefined
+                      }
                       className={cn(
                         "group/th relative h-9 px-2 text-left align-middle text-xs font-medium text-muted-foreground",
                         isPinned && "bg-card",
+                        isDropTarget &&
+                          "bg-primary/10 ring-2 ring-inset ring-primary/40",
                         meta?.headerClassName
                       )}
                     >
                       <div className="flex items-center gap-1">
-                        {!isUtility && f.reordering && (
+                        {canReorder && (
                           <span
                             draggable
                             onDragStart={(e) => onHeaderDragStart(header.column.id, e)}
-                            onDragOver={onHeaderDragOver}
-                            onDrop={() => onHeaderDrop(header.column.id)}
+                            onDragEnd={onHeaderDragEnd}
                             className="-ml-1 cursor-grab rounded p-0.5 text-muted-foreground/40 opacity-0 transition group-hover/th:opacity-100 hover:bg-muted hover:text-foreground active:cursor-grabbing"
                             title="Drag to reorder"
                           >
