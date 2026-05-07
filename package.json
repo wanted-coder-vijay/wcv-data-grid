@@ -1,5 +1,5 @@
 {
-  "name": "@wcv/data-grid",
+  "name": "@dynostack/gridstack",
   "version": "0.1.0",
   "description": "Enterprise-grade React DataGrid on TanStack + Radix + Tailwind, with operator-driven filters, inline editing, column pinning/resizing/reordering, CSV/Excel export, and full theme + i18n customization.",
   "license": "MIT",

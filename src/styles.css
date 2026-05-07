@@ -1,5 +1,5 @@
 /*
- * Default theme tokens for @wcv/data-grid.
+ * Default theme tokens for @dynostack/gridstack.
  *
  * Import this file once in your app (e.g. in main.tsx) IF you don't already
  * have shadcn/ui's tokens defined on :root. If shadcn is already set up,
