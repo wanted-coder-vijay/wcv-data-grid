@@ -1,15 +1,15 @@
 <div align="center">
 
-# @dynostack/gridstack
+# @dynostack/react-grid
 
 **Enterprise-grade React data grid. Drop-in.**
 
 Built on [TanStack Table v8](https://tanstack.com/table) · [Radix UI](https://www.radix-ui.com/) · [Tailwind CSS](https://tailwindcss.com/) · ships shadcn/ui look-and-feel out of the box.
 
-[![npm version](https://img.shields.io/npm/v/@dynostack/gridstack.svg?style=flat-square)](https://www.npmjs.com/package/@dynostack/gridstack)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@dynostack/gridstack?style=flat-square)](https://bundlephobia.com/package/@dynostack/gridstack)
-[![license](https://img.shields.io/npm/l/@dynostack/gridstack.svg?style=flat-square)](./LICENSE)
-[![types](https://img.shields.io/npm/types/@dynostack/gridstack?style=flat-square)](./dist/index.d.ts)
+[![npm version](https://img.shields.io/npm/v/@dynostack/react-grid.svg?style=flat-square)](https://www.npmjs.com/package/@dynostack/react-grid)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@dynostack/react-grid?style=flat-square)](https://bundlephobia.com/package/@dynostack/react-grid)
+[![license](https://img.shields.io/npm/l/@dynostack/react-grid.svg?style=flat-square)](./LICENSE)
+[![types](https://img.shields.io/npm/types/@dynostack/react-grid?style=flat-square)](./dist/index.d.ts)
 
 </div>
 
@@ -63,11 +63,11 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 ## Install
 
 ```sh
-npm i @dynostack/gridstack
+npm i @dynostack/react-grid
 # or
-pnpm add @dynostack/gridstack
+pnpm add @dynostack/react-grid
 # or
-yarn add @dynostack/gridstack
+yarn add @dynostack/react-grid
 ```
 
 **Peer deps:** `react >= 18`, `react-dom >= 18`. All other deps (`@tanstack/react-table`, `radix-ui`, `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`) are bundled.
@@ -81,7 +81,7 @@ The component ships Tailwind class names verbatim. Tell your Tailwind config to 
 export default {
   content: [
     "./src/**/*.{ts,tsx}",
-    "./node_modules/@dynostack/gridstack/dist/**/*.{js,mjs,cjs}",
+    "./node_modules/@dynostack/react-grid/dist/**/*.{js,mjs,cjs}",
   ],
 }
 ```
@@ -95,7 +95,7 @@ If your app already has [shadcn/ui](https://ui.shadcn.com/docs/theming) tokens d
 If not, import the default-tokens stylesheet once:
 
 ```ts
-import "@dynostack/gridstack/styles.css"
+import "@dynostack/react-grid/styles.css"
 ```
 
 Either way you can still override any token per-instance via the [`theme`](#theming) prop.
@@ -105,8 +105,8 @@ Either way you can still override any token per-instance via the [`theme`](#them
 ## Quick start
 
 ```tsx
-import { DataTable } from "@dynostack/gridstack"
-import "@dynostack/gridstack/styles.css" // optional — only if you don't have shadcn tokens
+import { DataTable } from "@dynostack/react-grid"
+import "@dynostack/react-grid/styles.css" // optional — only if you don't have shadcn tokens
 
 type User = {
   id: number
@@ -174,7 +174,7 @@ All shadcn tokens are supported plus `radius` and `fontFamily`. Anything you omi
 ### Use a preset
 
 ```tsx
-import { DataTable, themePresets } from "@dynostack/gridstack"
+import { DataTable, themePresets } from "@dynostack/react-grid"
 
 <DataTable data={data} columns={columns} theme={themePresets.violet} />
 ```
@@ -359,7 +359,7 @@ import {
   type TextOp,
   type NumberOp,
   type DateOp,
-} from "@dynostack/gridstack"
+} from "@dynostack/react-grid"
 ```
 
 | `filterType`   | Operators                                                                                                                  | Value shape                                          |
@@ -565,6 +565,8 @@ PRs welcome. Please keep the prop API additive — feature toggles over breaking
 
 See [NOTICE](./NOTICE) for attribution requirements.
 
-> Versions `0.1.0` was published under MIT. `0.1.1` and later are
-> released under Apache-2.0. The earlier MIT-licensed code remains
-> available to anyone who installed it before the relicense.
+> **Package history.** This package was briefly published as
+> `@dynostack/gridstack@0.1.0` under the MIT license before being
+> renamed to `@dynostack/react-grid` and relicensed under Apache-2.0.
+> The old name is deprecated; new code should depend on
+> `@dynostack/react-grid` only.
