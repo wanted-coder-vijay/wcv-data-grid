@@ -782,11 +782,13 @@ export function DataTable<TData extends { id: string | number }>({
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
-                      style={{
-                        width: header.getSize(),
-                        ...getPinningStyles(header.column),
-                        ...(isPinned ? { zIndex: 2 } : {}),
-                      }}
+                      draggable={canReorder}
+                      onDragStart={
+                        canReorder
+                          ? (e) => onHeaderDragStart(header.column.id, e)
+                          : undefined
+                      }
+                      onDragEnd={canReorder ? onHeaderDragEnd : undefined}
                       onDragOver={
                         canReorder ? onHeaderDragOver(header.column.id) : undefined
                       }
@@ -796,8 +798,14 @@ export function DataTable<TData extends { id: string | number }>({
                       onDrop={
                         canReorder ? onHeaderDrop(header.column.id) : undefined
                       }
+                      style={{
+                        width: header.getSize(),
+                        ...getPinningStyles(header.column),
+                        ...(isPinned ? { zIndex: 2 } : {}),
+                      }}
                       className={cn(
                         "group/th relative h-9 px-2 text-left align-middle text-xs font-medium text-muted-foreground",
+                        canReorder && "cursor-grab active:cursor-grabbing",
                         isPinned && "bg-card",
                         isDropTarget &&
                           "bg-primary/10 ring-2 ring-inset ring-primary/40",
@@ -806,17 +814,16 @@ export function DataTable<TData extends { id: string | number }>({
                     >
                       <div className="flex items-center gap-1">
                         {canReorder && (
-                          <span
-                            draggable
-                            onDragStart={(e) => onHeaderDragStart(header.column.id, e)}
-                            onDragEnd={onHeaderDragEnd}
-                            className="-ml-1 cursor-grab rounded p-0.5 text-muted-foreground/40 opacity-0 transition group-hover/th:opacity-100 hover:bg-muted hover:text-foreground active:cursor-grabbing"
-                            title="Drag to reorder"
-                          >
-                            <GripVerticalIcon className="size-3" />
-                          </span>
+                          <GripVerticalIcon
+                            className="-ml-1 size-3 shrink-0 text-muted-foreground/40 opacity-0 transition group-hover/th:opacity-100"
+                            aria-hidden="true"
+                          />
                         )}
-                        <div className="min-w-0 flex-1">
+                        <div
+                          className="min-w-0 flex-1"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          draggable={false}
+                        >
                           {header.isPlaceholder
                             ? null
                             : flexRender(header.column.columnDef.header, header.getContext())}
@@ -825,9 +832,16 @@ export function DataTable<TData extends { id: string | number }>({
 
                       {header.column.getCanResize() && (
                         <span
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                            header.getResizeHandler()(e)
+                          }}
+                          onTouchStart={(e) => {
+                            e.stopPropagation()
+                            header.getResizeHandler()(e)
+                          }}
                           onDoubleClick={() => header.column.resetSize()}
+                          draggable={false}
                           className={cn(
                             "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none bg-transparent transition-colors hover:bg-primary/40",
                             header.column.getIsResizing() && "bg-primary"
