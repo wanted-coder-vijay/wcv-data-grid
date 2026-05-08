@@ -642,45 +642,66 @@ export function DataTable<TData extends { id: string | number }>({
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  // ----- column drag-and-drop reordering --------------------------------
-  // The grip icon is the drag SOURCE (it carries `draggable`); the entire
-  // <th> is the drop ZONE. Putting onDragOver/onDrop on the small grip span
-  // only — as we used to — meant the browser rejected the drop unless the
-  // cursor landed precisely on a 12px target, which felt broken.
-  const dragState = useRef<{ src: string | null }>({ src: null })
+  // Pointer-event-based column reorder. HTML5 drag-and-drop refused to
+  // initiate when the user mousedown'd on an interactive child (sort
+  // dropdown button, filter trigger), which is most of the visible header
+  // area. Pointer events sidestep that.
+  const reorderState = useRef<{ x: number; y: number; id: string } | null>(null)
+  const [activeReorderId, setActiveReorderId] = useState<string | null>(null)
   const [dragOverColId, setDragOverColId] = useState<string | null>(null)
 
-  const onHeaderDragStart = (id: string, e: React.DragEvent) => {
-    dragState.current.src = id
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/plain", id)
+  const isInteractiveTarget = (target: EventTarget | null) => {
+    const el = target as HTMLElement | null
+    if (!el || !el.closest) return false
+    return !!el.closest(
+      'button, a, input, select, textarea, [role="menuitem"], [data-no-drag]'
+    )
   }
-  const onHeaderDragOver = (targetId: string) => (e: React.DragEvent) => {
-    if (!dragState.current.src) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    if (dragOverColId !== targetId) setDragOverColId(targetId)
+
+  const onHeaderPointerDown =
+    (id: string) => (e: React.PointerEvent<HTMLTableCellElement>) => {
+      if (e.button !== 0) return
+      if (isInteractiveTarget(e.target)) return
+      reorderState.current = { x: e.clientX, y: e.clientY, id }
+    }
+
+  const onHeaderPointerMove = (e: React.PointerEvent<HTMLTableCellElement>) => {
+    const start = reorderState.current
+    if (!start) return
+    if (!activeReorderId) {
+      const dx = e.clientX - start.x
+      const dy = e.clientY - start.y
+      if (Math.hypot(dx, dy) < 6) return
+      setActiveReorderId(start.id)
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const th = el ? (el.closest("th[data-col-id]") as HTMLElement | null) : null
+    const overId = th?.dataset.colId ?? null
+    const next = overId && overId !== start.id ? overId : null
+    if (next !== dragOverColId) setDragOverColId(next)
   }
-  const onHeaderDragLeave = (targetId: string) => () => {
-    if (dragOverColId === targetId) setDragOverColId(null)
-  }
-  const onHeaderDragEnd = () => {
-    dragState.current.src = null
+
+  const onHeaderPointerUp = (e: React.PointerEvent<HTMLTableCellElement>) => {
+    const start = reorderState.current
+    reorderState.current = null
+    if (!activeReorderId) return
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // pointer may already be released
+    }
+    const target = dragOverColId
+    setActiveReorderId(null)
     setDragOverColId(null)
-  }
-  const onHeaderDrop = (targetId: string) => (e: React.DragEvent) => {
-    e.preventDefault()
-    const src = dragState.current.src
-    dragState.current.src = null
-    setDragOverColId(null)
-    if (!src || src === targetId) return
+    if (!start || !target || target === start.id) return
     setColumnOrder((order) => {
       const next = [...order]
-      const from = next.indexOf(src)
-      const to = next.indexOf(targetId)
+      const from = next.indexOf(start.id)
+      const to = next.indexOf(target)
       if (from === -1 || to === -1) return order
       next.splice(from, 1)
-      next.splice(to, 0, src)
+      next.splice(to, 0, start.id)
       return next
     })
   }
@@ -778,25 +799,22 @@ export function DataTable<TData extends { id: string | number }>({
                   const canReorder = !isUtility && f.reordering
                   const isDropTarget =
                     canReorder && dragOverColId === header.column.id
+                  const isBeingDragged =
+                    canReorder && activeReorderId === header.column.id
                   return (
                     <th
                       key={header.id}
                       colSpan={header.colSpan}
-                      draggable={canReorder}
-                      onDragStart={
+                      data-col-id={header.column.id}
+                      onPointerDown={
                         canReorder
-                          ? (e) => onHeaderDragStart(header.column.id, e)
+                          ? onHeaderPointerDown(header.column.id)
                           : undefined
                       }
-                      onDragEnd={canReorder ? onHeaderDragEnd : undefined}
-                      onDragOver={
-                        canReorder ? onHeaderDragOver(header.column.id) : undefined
-                      }
-                      onDragLeave={
-                        canReorder ? onHeaderDragLeave(header.column.id) : undefined
-                      }
-                      onDrop={
-                        canReorder ? onHeaderDrop(header.column.id) : undefined
+                      onPointerMove={canReorder ? onHeaderPointerMove : undefined}
+                      onPointerUp={canReorder ? onHeaderPointerUp : undefined}
+                      onPointerCancel={
+                        canReorder ? onHeaderPointerUp : undefined
                       }
                       style={{
                         width: header.getSize(),
@@ -804,9 +822,10 @@ export function DataTable<TData extends { id: string | number }>({
                         ...(isPinned ? { zIndex: 2 } : {}),
                       }}
                       className={cn(
-                        "group/th relative h-9 px-2 text-left align-middle text-xs font-medium text-muted-foreground",
+                        "group/th relative h-9 px-2 text-left align-middle text-xs font-medium text-muted-foreground select-none",
                         canReorder && "cursor-grab active:cursor-grabbing",
                         isPinned && "bg-card",
+                        isBeingDragged && "opacity-50",
                         isDropTarget &&
                           "bg-primary/10 ring-2 ring-inset ring-primary/40",
                         meta?.headerClassName
@@ -819,11 +838,7 @@ export function DataTable<TData extends { id: string | number }>({
                             aria-hidden="true"
                           />
                         )}
-                        <div
-                          className="min-w-0 flex-1"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          draggable={false}
-                        >
+                        <div className="min-w-0 flex-1">
                           {header.isPlaceholder
                             ? null
                             : flexRender(header.column.columnDef.header, header.getContext())}
@@ -832,16 +847,11 @@ export function DataTable<TData extends { id: string | number }>({
 
                       {header.column.getCanResize() && (
                         <span
-                          onMouseDown={(e) => {
-                            e.stopPropagation()
-                            header.getResizeHandler()(e)
-                          }}
-                          onTouchStart={(e) => {
-                            e.stopPropagation()
-                            header.getResizeHandler()(e)
-                          }}
+                          data-no-drag
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onMouseDown={header.getResizeHandler()}
+                          onTouchStart={header.getResizeHandler()}
                           onDoubleClick={() => header.column.resetSize()}
-                          draggable={false}
                           className={cn(
                             "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none bg-transparent transition-colors hover:bg-primary/40",
                             header.column.getIsResizing() && "bg-primary"
