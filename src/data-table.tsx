@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react"
 import {
   type CellContext,
   type ColumnDef,
@@ -48,7 +48,25 @@ import {
   setFilterFn,
   textFilterFn,
 } from "./filters"
-import { themeToStyle, type DataTableTheme } from "./theme"
+import {
+  ISOLATE_DARK_TOKENS,
+  ISOLATE_LIGHT_TOKENS,
+  splitTheme,
+  tokensToCssBlock,
+  tokensToStyle,
+  type DataTableTheme,
+  type DataTableTokens,
+} from "./theme"
+import { PortalContainerContext } from "./portal-container"
+import {
+  DataTableViewSheet,
+  type ViewSheetConfig,
+} from "./data-table-view-sheet"
+import {
+  DataTableConfirmDelete,
+  type ConfirmDeleteConfig,
+  type ConfirmDeleteContext,
+} from "./data-table-confirm-delete"
 import "./types"
 
 // ----- public configuration types --------------------------------------
@@ -193,6 +211,8 @@ type EditingContextValue<TData> = {
   onRowAction?: (action: RowActionId, row: TData) => void
   onCellEdit?: (row: TData, columnId: string, value: unknown) => void
   onRowSave?: (row: TData, draft: Partial<TData>) => void
+  onView?: (row: TData) => void
+  onRequestDelete?: (row: TData) => void
 }
 
 const DataTableEditingContext = createContext<EditingContextValue<unknown> | null>(
@@ -259,6 +279,8 @@ function ActionsCellHost<TData>({ row }: CellContext<TData, unknown>) {
     customRowActions,
     onRowAction,
     onRowSave,
+    onView,
+    onRequestDelete,
   } = useEditingContext<TData>()
   const rowId = row.id
   const isRowEdit = editingRowId === rowId
@@ -287,6 +309,11 @@ function ActionsCellHost<TData>({ row }: CellContext<TData, unknown>) {
         if (a === "edit") {
           setEditingRowId(rowId)
           return
+        }
+        if (a === "view") {
+          onView?.(row.original)
+        } else if (a === "delete") {
+          onRequestDelete?.(row.original)
         }
         onRowAction?.(a, row.original)
       }}
@@ -320,6 +347,30 @@ export type DataTableProps<TData extends { id: string | number }> = {
   rowActions?: ("view" | "edit" | "duplicate" | "delete")[]
   customRowActions?: CustomRowAction<TData>[]
   onRowAction?: (action: RowActionId, row: TData) => void
+  /**
+   * Handler for the built-in "View" action. If omitted, the grid still opens
+   * the View sheet (unless `viewSheet={false}`). Use this to also log,
+   * navigate, or fetch detail data when a user opens View.
+   */
+  onView?: (row: TData) => void
+  /**
+   * Handler for the built-in "Delete" action. Fires *after* the user confirms
+   * in the delete modal (or immediately if `confirmDelete={false}`).
+   * If omitted, the grid only emits via `onRowAction("delete", row)`.
+   */
+  onDelete?: (row: TData) => void
+  /**
+   * Configure the built-in View sheet — side, density, custom renderers.
+   * Pass `false` to disable; clicking "View" will then only fire
+   * `onView` / `onRowAction` without opening a sheet.
+   */
+  viewSheet?: ViewSheetConfig<TData> | false
+  /**
+   * Configure the delete confirmation modal. Pass `false` to disable it and
+   * fire delete handlers immediately. Pass an object to customize title,
+   * description, and button labels. Defaults to enabled with built-in copy.
+   */
+  confirmDelete?: ConfirmDeleteConfig<TData> | boolean
 
   /** Commit a single edited cell. Receives the row, column id and new value. */
   onCellEdit?: (row: TData, columnId: string, value: unknown) => void
@@ -349,8 +400,31 @@ export type DataTableProps<TData extends { id: string | number }> = {
   labels?: DataTableLabels
   /** Row + cell padding density. Defaults to "default". */
   density?: DataTableDensity
-  /** CSS-variable overrides (shadcn-compatible) scoped to this instance. */
+  /**
+   * CSS-variable overrides (shadcn-compatible) scoped to this instance.
+   *
+   * Two accepted shapes:
+   *
+   *   theme={{ primary: "...", accent: "..." }}              // flat tokens
+   *   theme={{ light: { ... }, dark: { ... } }}              // moded — auto-flips
+   *
+   * Moded themes apply `light` always and swap to `dark` inside
+   * `@media (prefers-color-scheme: dark)` *and* inside any `.dark` ancestor.
+   *
+   * Use `themePresets.violet` (or any preset) for a ready-made moded theme.
+   */
   theme?: DataTableTheme
+  /**
+   * When `true`, the grid does NOT inherit CSS variables from the app's
+   * `:root` (shadcn, custom theme, etc.). Instead it renders with the
+   * package's bundled defaults (or whatever you pass via `theme`).
+   *
+   * Useful when embedding the grid inside a heavily-themed shell where you
+   * want the table to keep its own look regardless of surrounding context.
+   *
+   * Defaults to `false` (inherit app theme).
+   */
+  isolate?: boolean
 }
 
 const DEFAULT_LABELS: Required<DataTableLabels> = {
@@ -414,6 +488,11 @@ export function DataTable<TData extends { id: string | number }>({
   labels: labelsProp,
   density = "default",
   theme,
+  isolate = false,
+  onView,
+  onDelete,
+  viewSheet,
+  confirmDelete = true,
 }: DataTableProps<TData>) {
   const labels: Required<DataTableLabels> = { ...DEFAULT_LABELS, ...labelsProp }
   const f: Required<DataTableFeatures> = {
@@ -429,7 +508,75 @@ export function DataTable<TData extends { id: string | number }>({
     reordering: features?.reordering ?? true,
     pinning: features?.pinning ?? true,
   }
-  const themeStyle = themeToStyle(theme)
+  // ----- theme resolution ----------------------------------------------
+  // `theme` can be a flat token map OR a `{ light, dark }` moded shape.
+  // When `isolate` is true, fall back to bundled neutral defaults instead
+  // of inheriting from the app's :root.
+  const rawInstanceId = useId()
+  const instanceId = useMemo(
+    () => `dyno-grid-${rawInstanceId.replace(/[^a-zA-Z0-9]/g, "")}`,
+    [rawInstanceId]
+  )
+  const { lightStyle, darkCss } = useMemo(() => {
+    const { light, dark } = splitTheme(theme)
+    const lightTokens: DataTableTokens | undefined = isolate
+      ? { ...ISOLATE_LIGHT_TOKENS, ...(light ?? {}) }
+      : light
+    const darkTokens: DataTableTokens | undefined = isolate
+      ? { ...ISOLATE_DARK_TOKENS, ...(dark ?? light ?? {}) }
+      : dark
+    return {
+      lightStyle: tokensToStyle(lightTokens),
+      darkCss: darkTokens ? tokensToCssBlock(darkTokens) : null,
+    }
+  }, [theme, isolate])
+
+  // ----- portal container -----------------------------------------------
+  // Mount popovers / dropdowns / sheets inside the themed grid root so they
+  // inherit CSS variables. Using a callback ref ensures the context value
+  // flips from null → element on mount and triggers consumers to re-render.
+  const [gridRoot, setGridRoot] = useState<HTMLDivElement | null>(null)
+
+  // ----- view sheet + delete confirm state ------------------------------
+  const [viewRow, setViewRow] = useState<TData | null>(null)
+  const [confirmCtx, setConfirmCtx] =
+    useState<ConfirmDeleteContext<TData> | null>(null)
+
+  const confirmEnabled = confirmDelete !== false
+  const confirmConfig: ConfirmDeleteConfig<TData> | undefined =
+    typeof confirmDelete === "object" ? confirmDelete : undefined
+  const viewSheetEnabled = viewSheet !== false
+  const viewSheetConfig: ViewSheetConfig<TData> | undefined =
+    viewSheet && typeof viewSheet === "object" ? viewSheet : undefined
+
+  const handleViewRequest = (row: TData) => {
+    onView?.(row)
+    if (viewSheetEnabled) setViewRow(row)
+  }
+  const handleDeleteRequest = (row: TData) => {
+    if (confirmEnabled) {
+      setConfirmCtx({ rows: [row], source: "single" })
+    } else {
+      onDelete?.(row)
+    }
+  }
+  const handleBulkDeleteRequest = (rows: TData[]) => {
+    if (confirmEnabled) {
+      setConfirmCtx({ rows, source: "bulk" })
+    } else {
+      onBulkDelete?.(rows)
+    }
+  }
+  const handleConfirmDelete = () => {
+    if (!confirmCtx) return
+    if (confirmCtx.source === "single") {
+      onDelete?.(confirmCtx.rows[0])
+    } else {
+      onBulkDelete?.(confirmCtx.rows)
+    }
+    setConfirmCtx(null)
+  }
+
   // ----- state ----------------------------------------------------------
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -874,6 +1021,8 @@ export function DataTable<TData extends { id: string | number }>({
       onRowAction,
       onCellEdit,
       onRowSave,
+      onView: handleViewRequest,
+      onRequestDelete: handleDeleteRequest,
     }),
     [
       editingCell,
@@ -884,28 +1033,46 @@ export function DataTable<TData extends { id: string | number }>({
       onRowAction,
       onCellEdit,
       onRowSave,
+      // intentional: handleViewRequest / handleDeleteRequest close over
+      // viewSheetEnabled / confirmEnabled which are derived from props above.
+      // They're recreated each render; the inputs here capture the prop deps.
+      onView,
+      onDelete,
+      onBulkDelete,
+      viewSheetEnabled,
+      confirmEnabled,
     ]
   )
 
   return (
+    <PortalContainerContext.Provider value={gridRoot}>
     <DataTableEditingContext.Provider
       value={editingContextValue as unknown as EditingContextValue<unknown>}
     >
     <div
+      ref={setGridRoot}
+      data-dyno-grid={instanceId}
       className={cn(
-        "flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm",
+        "relative flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm",
         DENSITY_CLASS[density],
         className
       )}
-      style={themeStyle}
+      style={lightStyle}
     >
+      {darkCss && (
+        <style>
+          {`@media (prefers-color-scheme: dark){[data-dyno-grid="${instanceId}"]{${darkCss}}}`}
+          {`.dark [data-dyno-grid="${instanceId}"]{${darkCss}}`}
+          {`[data-dyno-grid="${instanceId}"].dark{${darkCss}}`}
+        </style>
+      )}
       <DataTableToolbar
         table={table}
         totalRecords={effectiveTotalRecords}
         isFetching={effectiveIsFetching}
         onRefresh={f.refresh ? effectiveOnRefresh : undefined}
         onAddRow={f.addRow ? handleAddRow : undefined}
-        onBulkDelete={onBulkDelete}
+        onBulkDelete={onBulkDelete ? handleBulkDeleteRequest : undefined}
         exportFileName={exportFileName}
         globalFilter={globalFilter}
         onGlobalFilterChange={(v) => {
@@ -1061,8 +1228,24 @@ export function DataTable<TData extends { id: string | number }>({
       {f.pagination && (
         <DataTablePagination table={table} pageSizeOptions={pageSizeOptions} />
       )}
+
+      <DataTableViewSheet
+        table={table}
+        row={viewRow}
+        open={viewRow != null}
+        onOpenChange={(o) => !o && setViewRow(null)}
+        config={viewSheetConfig}
+      />
+      <DataTableConfirmDelete
+        open={confirmCtx != null}
+        onOpenChange={(o) => !o && setConfirmCtx(null)}
+        context={confirmCtx}
+        onConfirm={handleConfirmDelete}
+        config={confirmConfig}
+      />
     </div>
     </DataTableEditingContext.Provider>
+    </PortalContainerContext.Provider>
   )
 }
 

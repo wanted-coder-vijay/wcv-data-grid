@@ -10,6 +10,20 @@ export type {
   DataTableErrorContext,
 } from "./data-table"
 
+export type {
+  ViewSheetConfig,
+  ViewSheetDensity,
+  ViewSheetLabels,
+} from "./data-table-view-sheet"
+export type {
+  ConfirmDeleteConfig,
+  ConfirmDeleteContext,
+} from "./data-table-confirm-delete"
+export {
+  PortalContainerContext,
+  usePortalContainer,
+} from "./portal-container"
+
 export { DataTableColumnHeader } from "./data-table-column-header"
 export {
   DataTableRowActions,
@@ -44,8 +58,16 @@ export { exportToCsv, exportToExcel } from "./export"
 
 export {
   themeToStyle,
+  tokensToStyle,
+  tokensToCssBlock,
+  splitTheme,
   themePresets,
+  buildPreset,
+  ISOLATE_LIGHT_TOKENS,
+  ISOLATE_DARK_TOKENS,
   type DataTableTheme,
+  type DataTableTokens,
+  type DataTableModedTheme,
   type DataTableThemeName,
 } from "./theme"
 

@@ -1,71 +1,170 @@
 /*
  * Default theme tokens for @dynostack/react-grid.
  *
- * Import this file once in your app (e.g. in main.tsx) IF you don't already
- * have shadcn/ui's tokens defined on :root. If shadcn is already set up,
- * skip this — the table will pick up the tokens you already provide.
+ * Drop-in behavior:
  *
- * You can still override any token per-instance via the `theme` prop.
+ *   import "@dynostack/react-grid/styles.css"
+ *
+ * What you get with this single import:
+ *
+ *   • Clean light tokens by default.
+ *   • Automatic dark-mode follow: switches when the OS reports
+ *     `prefers-color-scheme: dark`.
+ *   • Manual override: add the `.dark` (or `.light`) class to <html> or any
+ *     ancestor and the table flips immediately, ignoring OS preference.
+ *   • shadcn-compatible: token names match shadcn/ui's CSS variables exactly,
+ *     so if you already have shadcn (or any compatible theme) defined on
+ *     :root, *that* takes precedence and the grid blends in automatically.
+ *
+ * Cascade design
+ * --------------
+ * All declarations below live inside the `dynostack-grid-defaults` cascade
+ * layer. Any *unlayered* declaration in the consumer app (which is where
+ * shadcn and most app CSS lives) automatically wins, regardless of import
+ * order. This makes import order non-fragile — you cannot accidentally
+ * overwrite the consumer's theme by importing this file in the "wrong" spot.
+ *
+ *   <highest priority>
+ *     inline style on the grid root        (per-instance `theme` prop)
+ *     consumer's unlayered :root rules     (shadcn, custom app theme)
+ *     this file (@layer dynostack-grid-defaults)
+ *   <lowest priority>
  */
 
-:root {
-  --radius: 0.625rem;
+@layer dynostack-grid-defaults {
+  :root {
+    color-scheme: light;
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+    --radius: 0.625rem;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
 
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
 
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
 
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
 
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
 
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-}
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+  }
 
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
+  /* Auto-follow OS dark mode. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
 
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+      --background: oklch(0.145 0 0);
+      --foreground: oklch(0.985 0 0);
 
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+      --card: oklch(0.205 0 0);
+      --card-foreground: oklch(0.985 0 0);
 
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
+      --popover: oklch(0.205 0 0);
+      --popover-foreground: oklch(0.985 0 0);
 
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+      --primary: oklch(0.985 0 0);
+      --primary-foreground: oklch(0.205 0 0);
 
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+      --secondary: oklch(0.269 0 0);
+      --secondary-foreground: oklch(0.985 0 0);
 
-  --destructive: oklch(0.577 0.245 27.325 / 0.6);
-  --destructive-foreground: oklch(0.985 0 0);
+      --muted: oklch(0.269 0 0);
+      --muted-foreground: oklch(0.708 0 0);
 
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+      --accent: oklch(0.269 0 0);
+      --accent-foreground: oklch(0.985 0 0);
+
+      --destructive: oklch(0.577 0.245 27.325 / 0.6);
+      --destructive-foreground: oklch(0.985 0 0);
+
+      --border: oklch(0.269 0 0);
+      --input: oklch(0.269 0 0);
+      --ring: oklch(0.439 0 0);
+    }
+  }
+
+  /* Manual override — wins over the media query above. */
+  :root.light,
+  .light {
+    color-scheme: light;
+
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+  }
+
+  :root.dark,
+  .dark {
+    color-scheme: dark;
+
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+
+    --primary: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+
+    --destructive: oklch(0.577 0.245 27.325 / 0.6);
+    --destructive-foreground: oklch(0.985 0 0);
+
+    --border: oklch(0.269 0 0);
+    --input: oklch(0.269 0 0);
+    --ring: oklch(0.439 0 0);
+  }
 }

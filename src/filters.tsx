@@ -7,6 +7,13 @@ import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 import { Checkbox } from "./ui/checkbox"
 import { Separator } from "./ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select"
 
 // ---------- types -----------------------------------------------------
 
@@ -328,17 +335,21 @@ function OpSelect<Op extends string>({
   onChange: (v: Op) => void
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as Op)}
-      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:border-ring"
-    >
-      {ops.map((o) => (
-        <option key={o.v} value={o.v}>
-          {o.l}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={(v) => onChange(v as Op)}>
+      <SelectTrigger
+        size="sm"
+        className="h-8 w-full justify-between text-xs"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {ops.map((o) => (
+          <SelectItem key={o.v} value={o.v} className="text-xs">
+            {o.l}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

@@ -25,10 +25,14 @@ export default defineConfig({
     js: '"use client";',
   },
   async onSuccess() {
-    // Ship the default-tokens stylesheet.
+    // Ship the default-tokens stylesheet and optional page.css.
     await copyFile(
       resolve("src/styles.css"),
       resolve("dist/styles.css")
+    )
+    await copyFile(
+      resolve("src/page.css"),
+      resolve("dist/page.css")
     )
   },
 })

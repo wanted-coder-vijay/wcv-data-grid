@@ -1,0 +1,24 @@
+/*
+ * Optional page-level styling for @dynostack/react-grid.
+ *
+ * Import this AFTER `styles.css` if you want the page background and text
+ * color to follow the same tokens the grid uses — so the grid blends into
+ * the page instead of sitting on a contrasting body color.
+ *
+ *   import "@dynostack/react-grid/styles.css"
+ *   import "@dynostack/react-grid/page.css"   // optional
+ *
+ * Not imported by default — `styles.css` only declares tokens, never touches
+ * `html` or `body`, which keeps the grid embeddable inside heavily-themed
+ * shells without surprise side effects.
+ *
+ * Layered the same way as `styles.css` so consumer rules still win.
+ */
+
+@layer dynostack-grid-defaults {
+  html,
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}

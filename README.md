@@ -26,7 +26,7 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 - **Selection + bulk actions** — pinned `__select` column with select-all, clear, bulk delete
 - **Expandable rows** — provide a `renderSubRow` panel or use TanStack's nested `getSubRows`
 - **CSV / Excel export** — selection-aware (export selected vs. all)
-- **Theming** — built on shadcn/ui CSS variables; per-instance overrides with a `theme` prop and ready-made presets
+- **Theming that just works** — shadcn-compatible CSS variables, automatic OS dark-mode follow, cascade-layered defaults that never overwrite your app theme, full-repaint moded presets (`violet`, `emerald`, `amber`, `rose`, `sky`, `slate`, …), `buildPreset(hue)` for custom hues, and `isolate` to opt out of inheriting the app theme
 - **Density** — `compact` · `default` · `comfortable`
 - **i18n / labels** — every visible string is overridable
 - **Feature flags** — turn off any toolbar control or table capability with a single boolean
@@ -51,6 +51,8 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 - [Selection & bulk actions](#selection--bulk-actions)
 - [Expandable rows](#expandable-rows)
 - [Export](#export)
+- [View sheet](#view-sheet)
+- [Delete confirmation](#delete-confirmation)
 - [Custom row actions](#custom-row-actions)
 - [Server-side data](#server-side-data)
 - [API reference](#api-reference)
@@ -91,13 +93,43 @@ export default {
 
 ## Theme tokens
 
-If your app already has [shadcn/ui](https://ui.shadcn.com/docs/theming) tokens defined on `:root`, you're done — the table inherits them automatically.
+The grid is built on **shadcn/ui CSS variables**. It auto-adjusts to whatever theme your app already has:
 
-If not, import the default-tokens stylesheet once:
+| Your app has… | What you do | What you get |
+|---|---|---|
+| Nothing (bare React) | `import "@dynostack/react-grid/styles.css"` | Clean light theme, auto-switches to dark on OS preference. |
+| shadcn/ui (default theme) | Nothing | Grid inherits your `:root` tokens automatically. |
+| shadcn/ui with a custom theme (Stone / Zinc / your own hue) | Nothing | Grid picks up your custom tokens automatically. |
+| Custom theme using shadcn token names | Nothing | Same as above. |
+| Custom theme with non-shadcn names | Pass [`theme` prop](#theming) | Per-instance override mapped to shadcn vars. |
+| Want one grid to ignore the app theme | Pass `isolate` | Grid uses bundled defaults regardless of `:root`. |
+
+**Why this just works.** The bundled `styles.css` declares its defaults inside the `dynostack-grid-defaults` cascade layer. Any unlayered consumer rule (which is where shadcn and most app CSS lives) automatically wins — import order doesn't matter, and you can't accidentally overwrite your app's theme by importing the grid's stylesheet.
+
+### Minimal install
+
+```ts
+// main.tsx — once per app
+import "@dynostack/react-grid/styles.css"
+```
+
+### Optional: extend the theme to the page
+
+By default the grid only styles itself, not the surrounding page. If you want `<body>` to use the same background/foreground as the grid:
 
 ```ts
 import "@dynostack/react-grid/styles.css"
+import "@dynostack/react-grid/page.css"   // optional
 ```
+
+### Dark mode
+
+| Mode | How to enable | Behavior |
+|---|---|---|
+| Follow OS | Default — no action required | Light by day, dark by night via `prefers-color-scheme`. |
+| Force light | Add `class="light"` to `<html>` | Stays light regardless of OS. |
+| Force dark | Add `class="dark"` to `<html>` | Stays dark regardless of OS. |
+| Per-instance | `<DataTable theme={themePresets.violet}>` | Grid auto-flips light/dark inside the moded preset. |
 
 Either way you can still override any token per-instance via the [`theme`](#theming) prop.
 
@@ -248,24 +280,12 @@ rollback, toast notifications, and validation.
 
 ## Theming
 
-All shadcn tokens are supported plus `radius` and `fontFamily`. Anything you omit falls through to the consumer's `:root`.
+The `theme` prop accepts **two shapes**. Pick whichever fits your use case.
 
-### Use a preset
-
-```tsx
-import { DataTable, themePresets } from "@dynostack/react-grid"
-
-<DataTable data={data} columns={columns} theme={themePresets.violet} />
-```
-
-Available presets: `light` · `dark` · `emerald` · `violet` · `amber`.
-
-### Custom tokens
+### Shape 1 — Flat tokens
 
 ```tsx
 <DataTable
-  data={data}
-  columns={columns}
   theme={{
     primary: "oklch(0.6 0.2 200)",
     primaryForeground: "oklch(1 0 0)",
@@ -276,14 +296,100 @@ Available presets: `light` · `dark` · `emerald` · `violet` · `amber`.
 />
 ```
 
-CSS variables are emitted on the table root, so multiple instances on the same page can wear different themes.
+All shadcn tokens are supported plus `radius` and `fontFamily`. Anything you omit falls through to whatever your app's `:root` provides.
+
+### Shape 2 — Moded `{ light, dark }`
+
+A moded theme repaints the whole table **and** auto-flips on dark mode (OS preference *or* a `.dark` ancestor):
+
+```tsx
+<DataTable
+  theme={{
+    light: { background: "oklch(0.99 0.005 285)", primary: "oklch(0.55 0.22 285)", /* … */ },
+    dark:  { background: "oklch(0.16 0.012 285)", primary: "oklch(0.7  0.18 285)", /* … */ },
+  }}
+/>
+```
+
+The grid emits a tiny scoped `<style>` block that targets only this instance — multiple grids on the same page can wear different moded themes without interfering.
+
+### Use a preset
+
+Presets ship in **moded shape** — passing one repaints the entire table and follows dark mode automatically:
+
+```tsx
+import { DataTable, themePresets } from "@dynostack/react-grid"
+
+<DataTable theme={themePresets.violet} />
+```
+
+Available presets:
+
+| Preset | Hue |
+|---|---|
+| `neutral` | Grayscale (default appearance) |
+| `light` | Force light, no dark variant |
+| `dark` | Force dark, no light variant |
+| `violet` | 285° |
+| `emerald` | 162° |
+| `amber` | 65° |
+| `rose` | 15° |
+| `sky` | 235° |
+| `slate` | 240° (low chroma) |
+
+### Build a custom preset from a single hue
+
+```tsx
+import { DataTable, buildPreset } from "@dynostack/react-grid"
+
+const teal = buildPreset(180)        // hue only
+const subtleTeal = buildPreset(180, 0.015)  // hue + custom chroma
+
+<DataTable theme={teal} />
+```
+
+`buildPreset(hue, chroma?)` returns a full `{ light, dark }` token set tinted around the given OKLCH hue.
 
 ### Compose with a preset
 
 ```tsx
 <DataTable
-  theme={{ ...themePresets.dark, primary: "oklch(0.7 0.18 250)" }}
+  theme={{
+    ...themePresets.violet,
+    light: { ...themePresets.violet.light, primary: "oklch(0.7 0.18 250)" },
+  }}
 />
+```
+
+### Isolate a grid from the app theme
+
+When embedding inside a heavily-themed shell where you want the table to keep its own look:
+
+```tsx
+<DataTable isolate /* uses bundled neutral tokens, ignores app :root */ />
+<DataTable isolate theme={themePresets.violet} /* isolated AND violet */ />
+```
+
+### Multiple grids, different themes
+
+CSS variables are emitted on each table root, so this works:
+
+```tsx
+<DataTable theme={themePresets.violet} />
+<DataTable theme={themePresets.emerald} />
+<DataTable theme={{ primary: "oklch(0.6 0.2 200)" }} />
+```
+
+### Precedence summary
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Inline style on the grid root  (per-instance `theme`)    │  ← highest
+├──────────────────────────────────────────────────────────┤
+│ Consumer's :root rules         (shadcn, custom app CSS)  │
+├──────────────────────────────────────────────────────────┤
+│ @layer dynostack-grid-defaults (bundled styles.css)      │  ← lowest
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -506,6 +612,72 @@ Mark a column non-exportable via `meta.exportable: false`.
 
 ---
 
+## View sheet
+
+Click the row action "View" → a right-side `Sheet` slides in showing every visible column as a `{Label}: {value}` card. The user can switch layout density inline (Compact 1 col / Relaxed 2 col / Comfy 3 col).
+
+Works out of the box with no props. Customize via `viewSheet`:
+
+```tsx
+<DataTable
+  viewSheet={{
+    side: "right",                              // or "left"
+    defaultDensity: "relaxed",                  // initial column count
+    hideDensityTabs: true,                      // hide the layout picker
+    fields: ["name", "email", "role"],          // limit / reorder shown columns
+    renderField: ({ column, value, row }) =>    // override how a value renders
+      column.id === "phone" ? <a href={`tel:${value}`}>{String(value)}</a> : null,
+    renderHeader: (row) => <YourCustomHeader row={row} />,
+    labels: {
+      title: (row) => `${row.name} (${row.role})`,
+      description: (row) => `Joined ${row.joinedAt}`,
+      emptyValue: "—",
+      density: { compact: "1 col", relaxed: "2 cols", comfy: "3 cols" },
+    },
+  }}
+  onView={(row) => track("user.view", row)}   // optional side-effect
+/>
+```
+
+Disable the built-in sheet entirely:
+
+```tsx
+<DataTable viewSheet={false} onView={(row) => router.push(`/users/${row.id}`)} />
+```
+
+`onView` fires before the sheet opens, so you can navigate / log / fetch alongside it.
+
+---
+
+## Delete confirmation
+
+Both the row-action "Delete" and the toolbar "Bulk delete" open a confirmation `AlertDialog` by default. The user must confirm before `onDelete` or `onBulkDelete` fires.
+
+```tsx
+<DataTable
+  onDelete={(row) => api.deleteUser(row.id)}
+  onBulkDelete={(rows) => api.bulkDelete(rows.map(r => r.id))}
+  confirmDelete={{
+    title: ({ rows, source }) =>
+      source === "bulk"
+        ? `Delete ${rows.length} users?`
+        : `Delete ${rows[0].name}?`,
+    description: ({ rows }) =>
+      `${rows.length === 1 ? "This user" : "These users"} will be permanently removed. This cannot be undone.`,
+    confirmLabel: "Yes, delete",
+    cancelLabel: "Keep",
+  }}
+/>
+```
+
+Skip the dialog (fire immediately):
+
+```tsx
+<DataTable confirmDelete={false} onDelete={(row) => softDelete(row)} />
+```
+
+---
+
 ## Custom row actions
 
 ```tsx
@@ -625,7 +797,12 @@ operations and only renders the returned page.
 | `features`                | `DataTableFeatures`                                        | all on                 | Feature flags.                                         |
 | `labels`                  | `DataTableLabels`                                          | English defaults       | i18n labels.                                           |
 | `density`                 | `"compact" \| "default" \| "comfortable"`                  | `"default"`            | Row density.                                           |
-| `theme`                   | `DataTableTheme`                                           | inherits `:root`       | Per-instance CSS-variable overrides.                   |
+| `theme`                   | `DataTableTheme`                                           | inherits `:root`       | Per-instance CSS-variable overrides. Accepts flat tokens **or** `{ light, dark }`. |
+| `isolate`                 | `boolean`                                                  | `false`                | Ignore the app's `:root` and render with bundled defaults. |
+| `onView`                  | `(row: TData) => void`                                     | —                      | Side-effect when "View" is clicked. Fires *before* the sheet opens. |
+| `onDelete`                | `(row: TData) => void`                                     | —                      | Single-row delete handler. Fires *after* the confirm modal (or immediately if `confirmDelete={false}`). |
+| `viewSheet`               | `ViewSheetConfig<TData> \| false`                          | enabled                | Configure or disable the built-in View sheet. |
+| `confirmDelete`           | `ConfirmDeleteConfig<TData> \| boolean`                    | `true`                 | Configure or disable the delete confirmation modal (applies to single + bulk). |
 
 `TData` must extend `{ id: string \| number }`.
 
@@ -646,6 +823,90 @@ type DataTableDataSource<TData> = {
     error: unknown,
     context: { type: "load" | "refresh"; message: string }
   ) => void
+}
+```
+
+```ts
+// Theme types
+type DataTableTokens = {
+  background?: string
+  foreground?: string
+  card?: string
+  cardForeground?: string
+  popover?: string
+  popoverForeground?: string
+  primary?: string
+  primaryForeground?: string
+  secondary?: string
+  secondaryForeground?: string
+  muted?: string
+  mutedForeground?: string
+  accent?: string
+  accentForeground?: string
+  destructive?: string
+  destructiveForeground?: string
+  border?: string
+  input?: string
+  ring?: string
+  radius?: string
+  fontFamily?: string
+}
+
+type DataTableModedTheme = {
+  light?: DataTableTokens
+  dark?: DataTableTokens
+}
+
+type DataTableTheme = DataTableTokens | DataTableModedTheme
+```
+
+```ts
+// Theme exports
+import {
+  themePresets,        // ready-made moded presets
+  buildPreset,         // (hue, chroma?) => DataTableModedTheme
+  splitTheme,          // (theme) => { light, dark }
+  tokensToStyle,       // (tokens) => React.CSSProperties
+  tokensToCssBlock,    // (tokens) => "var:val;var:val" string
+  ISOLATE_LIGHT_TOKENS,
+  ISOLATE_DARK_TOKENS,
+} from "@dynostack/react-grid"
+```
+
+```ts
+// View sheet types
+type ViewSheetDensity = "compact" | "relaxed" | "comfy"
+
+type ViewSheetConfig<TData> = {
+  side?: "right" | "left" | "top" | "bottom"
+  defaultDensity?: ViewSheetDensity
+  hideDensityTabs?: boolean
+  fields?: string[]
+  renderField?: (args: {
+    column: Column<TData, unknown>
+    value: unknown
+    row: TData
+  }) => React.ReactNode
+  renderHeader?: (row: TData) => React.ReactNode
+  labels?: {
+    title?: (row: TData) => React.ReactNode
+    description?: (row: TData) => React.ReactNode
+    emptyValue?: string
+    density?: { compact?: string; relaxed?: string; comfy?: string }
+  }
+}
+
+// Confirm-delete types
+type ConfirmDeleteContext<TData> = {
+  rows: TData[]
+  source: "single" | "bulk"
+}
+
+type ConfirmDeleteConfig<TData> = {
+  title?: (ctx: ConfirmDeleteContext<TData>) => React.ReactNode
+  description?: (ctx: ConfirmDeleteContext<TData>) => React.ReactNode
+  confirmLabel?: string
+  cancelLabel?: string
 }
 ```
 

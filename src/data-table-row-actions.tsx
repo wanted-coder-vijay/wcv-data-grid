@@ -12,6 +12,7 @@ import {
 
 import { Button } from "./ui/button"
 import { cn } from "./lib/utils"
+import { usePortalContainer } from "./portal-container"
 
 export type RowActionId = "view" | "edit" | "duplicate" | "delete" | string
 
@@ -60,15 +61,26 @@ export function DataTableRowActions<TData>({
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const portalContainer = usePortalContainer()
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
-    setMenuPosition({
-      top: rect.bottom + 4,
-      left: Math.max(8, rect.right - 160),
-    })
-  }, [open])
+    if (portalContainer) {
+      // Position relative to the container instead of the viewport so that
+      // the menu inherits the grid's themed CSS variables.
+      const cRect = portalContainer.getBoundingClientRect()
+      setMenuPosition({
+        top: rect.bottom - cRect.top + 4,
+        left: Math.max(8, rect.right - cRect.left - 160),
+      })
+    } else {
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left: Math.max(8, rect.right - 160),
+      })
+    }
+  }, [open, portalContainer])
 
   useEffect(() => {
     if (!open) return
@@ -133,8 +145,12 @@ export function DataTableRowActions<TData>({
         createPortal(
           <div
             ref={menuRef}
-            className="fixed z-[1000] w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg"
-            style={{ top: menuPosition.top, left: menuPosition.left }}
+            className="z-[1000] w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg"
+            style={{
+              position: portalContainer ? "absolute" : "fixed",
+              top: menuPosition.top,
+              left: menuPosition.left,
+            }}
           >
             {actions.map((a) => (
               <RowActionButton
@@ -166,7 +182,7 @@ export function DataTableRowActions<TData>({
                 </RowActionButton>
               ))}
           </div>,
-          document.body
+          portalContainer ?? document.body
         )}
     </div>
   )
