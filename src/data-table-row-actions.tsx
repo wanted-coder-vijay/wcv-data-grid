@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import {
   CopyIcon,
   EyeIcon,
@@ -56,15 +57,39 @@ export function DataTableRowActions<TData>({
   onCancelEdit,
 }: DataTableRowActionsProps<TData>) {
   const [open, setOpen] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setMenuPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.right - 160),
+    })
+  }, [open])
 
   useEffect(() => {
     if (!open) return
     const onPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (
+        !menuRef.current?.contains(target) &&
+        !triggerRef.current?.contains(target)
+      ) {
+        setOpen(false)
+      }
     }
+    const onDismiss = () => setOpen(false)
     document.addEventListener("pointerdown", onPointerDown)
-    return () => document.removeEventListener("pointerdown", onPointerDown)
+    window.addEventListener("scroll", onDismiss, true)
+    window.addEventListener("resize", onDismiss)
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown)
+      window.removeEventListener("scroll", onDismiss, true)
+      window.removeEventListener("resize", onDismiss)
+    }
   }, [open])
 
   if (isEditing) {
@@ -94,6 +119,7 @@ export function DataTableRowActions<TData>({
   return (
     <div ref={menuRef} className="relative flex justify-end">
       <Button
+        ref={triggerRef}
         variant="ghost"
         size="icon-xs"
         aria-label="Open row actions"
@@ -103,39 +129,45 @@ export function DataTableRowActions<TData>({
         <MoreHorizontalIcon />
       </Button>
 
-      {open && (
-        <div className="absolute top-7 right-0 z-50 w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
-          {actions.map((a) => (
-            <RowActionButton
-              key={a}
-              danger={a === "delete"}
-              onClick={() => {
-                setOpen(false)
-                onAction?.(a, row)
-              }}
-            >
-              {builtinIcons[a]} {builtinLabels[a]}
-            </RowActionButton>
-          ))}
-          {customActions.length > 0 && actions.length > 0 && (
-            <div className="-mx-1 my-1 h-px bg-border" />
-          )}
-          {customActions
-            .filter((c) => (c.show ? c.show(row) : true))
-            .map((c) => (
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[1000] w-40 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
+            {actions.map((a) => (
               <RowActionButton
-                key={c.id}
-                danger={c.danger}
+                key={a}
+                danger={a === "delete"}
                 onClick={() => {
                   setOpen(false)
-                  onAction?.(c.id, row)
+                  onAction?.(a, row)
                 }}
               >
-                {c.icon} {c.label}
+                {builtinIcons[a]} {builtinLabels[a]}
               </RowActionButton>
             ))}
-        </div>
-      )}
+            {customActions.length > 0 && actions.length > 0 && (
+              <div className="-mx-1 my-1 h-px bg-border" />
+            )}
+            {customActions
+              .filter((c) => (c.show ? c.show(row) : true))
+              .map((c) => (
+                <RowActionButton
+                  key={c.id}
+                  danger={c.danger}
+                  onClick={() => {
+                    setOpen(false)
+                    onAction?.(c.id, row)
+                  }}
+                >
+                  {c.icon} {c.label}
+                </RowActionButton>
+              ))}
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

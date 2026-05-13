@@ -92,6 +92,8 @@ export type DataTableLabels = {
   total?: string
   noData?: string
   noResults?: string
+  loadError?: string
+  retry?: string
   refreshing?: string
   rowsPerPage?: string
   page?: string
@@ -99,6 +101,47 @@ export type DataTableLabels = {
 }
 
 export type DataTableDensity = "compact" | "default" | "comfortable"
+
+export type DataTableFetchParams = {
+  pageIndex: number
+  pageSize: number
+  sorting: SortingState
+  columnFilters: ColumnFiltersState
+  globalFilter: string
+}
+
+export type DataTableDataSourceResult<TData> =
+  | TData[]
+  | {
+      rows: TData[]
+      totalRecords?: number
+    }
+
+export type DataTableErrorContext = {
+  type: "load" | "refresh"
+  message: string
+}
+
+export type DataTableDataSource<TData> = {
+  /**
+   * Fetch rows internally. In "client" mode, return the full data set and the
+   * table applies client-side sort/filter/pagination. In "server" mode, return
+   * the current page and optionally `totalRecords`.
+   */
+  fetchRows: (
+    params: DataTableFetchParams
+  ) => Promise<DataTableDataSourceResult<TData>>
+  /** "client" by default. Use "server" for API-side pagination/filter/sort. */
+  mode?: "client" | "server"
+  /** Set false to pause fetching. */
+  enabled?: boolean
+  /** Optional rows to show before the first fetch resolves. */
+  initialData?: TData[]
+  /** Refetch when these external values change. Memoize this array. */
+  deps?: readonly unknown[]
+  /** Called for load/refresh errors so apps can show a toast. */
+  onError?: (error: unknown, context: DataTableErrorContext) => void
+}
 
 // ----- helpers ----------------------------------------------------------
 
@@ -254,8 +297,11 @@ function ActionsCellHost<TData>({ row }: CellContext<TData, unknown>) {
 // ----- types ------------------------------------------------------------
 
 export type DataTableProps<TData extends { id: string | number }> = {
-  data: TData[]
+  data?: TData[]
   columns: ColumnDef<TData>[]
+
+  /** Optional internal fetcher. Omit this when using controlled `data`. */
+  dataSource?: DataTableDataSource<TData>
 
   isLoading?: boolean
   isFetching?: boolean
@@ -321,6 +367,8 @@ const DEFAULT_LABELS: Required<DataTableLabels> = {
   total: "Total",
   noData: "No data.",
   noResults: "No rows match the current filters.",
+  loadError: "Could not load rows.",
+  retry: "Retry",
   refreshing: "Refreshing",
   rowsPerPage: "Rows per page",
   page: "Page",
@@ -338,6 +386,7 @@ const DENSITY_CLASS: Record<DataTableDensity, string> = {
 export function DataTable<TData extends { id: string | number }>({
   data,
   columns,
+  dataSource,
   isLoading,
   isFetching,
   onRefresh,
@@ -369,7 +418,7 @@ export function DataTable<TData extends { id: string | number }>({
   const labels: Required<DataTableLabels> = { ...DEFAULT_LABELS, ...labelsProp }
   const f: Required<DataTableFeatures> = {
     search: features?.search ?? true,
-    refresh: features?.refresh ?? !!onRefresh,
+    refresh: features?.refresh ?? !!(onRefresh || dataSource),
     columnVisibility: features?.columnVisibility ?? true,
     export: features?.export ?? true,
     addRow: features?.addRow ?? !!onAddRow,
@@ -417,18 +466,102 @@ export function DataTable<TData extends { id: string | number }>({
     pageIndex: 0,
     pageSize: initialPageSize,
   })
+  const [sourceRows, setSourceRows] = useState<TData[]>(
+    () => dataSource?.initialData ?? []
+  )
+  const [sourceTotalRecords, setSourceTotalRecords] = useState<
+    number | undefined
+  >(undefined)
+  const [sourceError, setSourceError] = useState<unknown>(null)
+  const [sourceLoading, setSourceLoading] = useState(false)
+  const [sourceFetching, setSourceFetching] = useState(false)
+  const [sourceRefreshKey, setSourceRefreshKey] = useState(0)
 
   // editing state — single cell or whole row
   const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null)
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [rowDraft, setRowDraft] = useState<Record<string, Partial<TData>>>({})
 
+  const dataSourceEnabled = !!dataSource && dataSource.enabled !== false
+  const dataSourceMode = dataSource?.mode ?? "client"
+  const isServerSideDataSource =
+    dataSourceEnabled && dataSourceMode === "server"
+  const dataSourceDeps = dataSource?.deps ?? []
+
+  useEffect(() => {
+    if (!dataSourceEnabled || !dataSource) return
+
+    let cancelled = false
+    const isInitialLoad = sourceRows.length === 0
+
+    setSourceError(null)
+    setSourceLoading(isInitialLoad)
+    setSourceFetching(!isInitialLoad)
+
+    dataSource
+      .fetchRows({
+        pageIndex: pagination.pageIndex,
+        pageSize: pagination.pageSize,
+        sorting,
+        columnFilters,
+        globalFilter,
+      })
+      .then((result) => {
+        if (cancelled) return
+        const rows = Array.isArray(result) ? result : result.rows
+        setSourceRows(rows)
+        setSourceTotalRecords(
+          Array.isArray(result) ? rows.length : result.totalRecords ?? rows.length
+        )
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setSourceError(error)
+        dataSource.onError?.(error, {
+          type: isInitialLoad ? "load" : "refresh",
+          message: isInitialLoad ? labels.loadError : labels.refreshing,
+        })
+      })
+      .finally(() => {
+        if (cancelled) return
+        setSourceLoading(false)
+        setSourceFetching(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    dataSourceEnabled,
+    dataSource,
+    sourceRefreshKey,
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+    columnFilters,
+    globalFilter,
+    labels.loadError,
+    labels.refreshing,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ...dataSourceDeps,
+  ])
+
+  const baseData = dataSourceEnabled ? sourceRows : data ?? []
+  const effectiveIsLoading = dataSourceEnabled ? sourceLoading : isLoading
+  const effectiveIsFetching = dataSourceEnabled ? sourceFetching : isFetching
+  const effectiveOnRefresh = dataSourceEnabled
+    ? () => setSourceRefreshKey((key) => key + 1)
+    : onRefresh
+
   // newly added rows kept in local state until persisted
   const [extraRows, setExtraRows] = useState<TData[]>([])
   const mergedData = useMemo(
-    () => (extraRows.length ? [...extraRows, ...data] : data),
-    [extraRows, data]
+    () => (extraRows.length ? [...extraRows, ...baseData] : baseData),
+    [extraRows, baseData]
   )
+  const effectiveTotalRecords =
+    totalRecords ??
+    (dataSourceEnabled ? sourceTotalRecords ?? mergedData.length : mergedData.length)
 
   // ----- column augmentation -------------------------------------------
   const augmentedColumns = useMemo<ColumnDef<TData>[]>(() => {
@@ -617,6 +750,12 @@ export function DataTable<TData extends { id: string | number }>({
     enableRowSelection: true,
     enableExpanding: !!(renderSubRow || getSubRows),
     enablePinning: f.pinning,
+    manualPagination: isServerSideDataSource,
+    manualSorting: isServerSideDataSource,
+    manualFiltering: isServerSideDataSource,
+    pageCount: isServerSideDataSource
+      ? Math.max(1, Math.ceil(effectiveTotalRecords / pagination.pageSize))
+      : undefined,
     getRowId: (row) => String(row.id),
     getSubRows,
     getRowCanExpand: (row) => {
@@ -762,9 +901,9 @@ export function DataTable<TData extends { id: string | number }>({
     >
       <DataTableToolbar
         table={table}
-        totalRecords={totalRecords ?? mergedData.length}
-        isFetching={isFetching}
-        onRefresh={f.refresh ? onRefresh : undefined}
+        totalRecords={effectiveTotalRecords}
+        isFetching={effectiveIsFetching}
+        onRefresh={f.refresh ? effectiveOnRefresh : undefined}
         onAddRow={f.addRow ? handleAddRow : undefined}
         onBulkDelete={onBulkDelete}
         exportFileName={exportFileName}
@@ -866,8 +1005,28 @@ export function DataTable<TData extends { id: string | number }>({
           </thead>
 
           <tbody>
-            {isLoading ? (
+            {effectiveIsLoading ? (
               renderSkeleton(visibleLeafCount, pagination.pageSize)
+            ) : sourceError && rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={visibleLeafCount}
+                  className="h-32 text-center text-sm text-muted-foreground"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <span>{labels.loadError}</span>
+                    {effectiveOnRefresh && (
+                      <button
+                        type="button"
+                        onClick={effectiveOnRefresh}
+                        className="rounded-md border px-2 py-1 text-xs text-foreground hover:bg-muted"
+                      >
+                        {labels.retry}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
             ) : rows.length === 0 ? (
               <tr>
                 <td
@@ -892,7 +1051,7 @@ export function DataTable<TData extends { id: string | number }>({
           </tbody>
         </table>
 
-        {isFetching && !isLoading && (
+        {effectiveIsFetching && !effectiveIsLoading && (
           <div className="pointer-events-none absolute top-1.5 right-2 flex items-center gap-1.5 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
             <Loader2Icon className="size-3 animate-spin" /> {labels.refreshing}
           </div>

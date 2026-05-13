@@ -4,6 +4,10 @@ export type {
   DataTableFeatures,
   DataTableLabels,
   DataTableDensity,
+  DataTableFetchParams,
+  DataTableDataSource,
+  DataTableDataSourceResult,
+  DataTableErrorContext,
 } from "./data-table"
 
 export { DataTableColumnHeader } from "./data-table-column-header"

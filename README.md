@@ -40,6 +40,7 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 - [Tailwind setup](#tailwind-setup)
 - [Theme tokens](#theme-tokens)
 - [Quick start](#quick-start)
+- [Data fetching](#data-fetching)
 - [Theming](#theming)
 - [Density](#density)
 - [Feature flags](#feature-flags)
@@ -164,6 +165,84 @@ export function Users({ data }: { data: User[] }) {
 ```
 
 That's it. You now have sort + filter + edit + add + delete + export + pin + resize + reorder + select.
+
+---
+
+## Data fetching
+
+`DataTable` supports two data ownership models.
+
+### 1. Controlled data from your page
+
+Use this when your app already owns fetching with TanStack Query, SWR, Redux,
+loader functions, or custom hooks. The table receives rows and loading flags as
+props, and your app owns error/toast behavior.
+
+```tsx
+const usersQuery = useQuery({
+  queryKey: ["users"],
+  queryFn: fetchUsers,
+})
+
+<DataTable<User>
+  data={usersQuery.data ?? []}
+  columns={columns}
+  isLoading={usersQuery.isLoading}
+  isFetching={usersQuery.isFetching}
+  onRefresh={() => usersQuery.refetch()}
+  totalRecords={usersQuery.data?.length ?? 0}
+/>
+```
+
+For blocking load errors, render your own page-level error state or pass an empty
+array. For background errors, show a toast from your query/mutation callbacks.
+
+### 2. Internal fetching with `dataSource`
+
+Use this when you want the table to own fetch/loading/error/refresh state.
+`fetchRows` receives the current table state and can return either an array or
+`{ rows, totalRecords }`.
+
+```tsx
+<DataTable<User>
+  columns={columns}
+  dataSource={{
+    fetchRows: async ({ pageIndex, pageSize, sorting, columnFilters, globalFilter }) => {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pageIndex,
+          pageSize,
+          sorting,
+          columnFilters,
+          q: globalFilter,
+        }),
+      })
+
+      if (!res.ok) throw new Error("Failed to load users")
+      return res.json() as Promise<{ rows: User[]; totalRecords: number }>
+    },
+    mode: "server",
+    onError: (error, context) => {
+      toast.error(context.message)
+      console.error(error)
+    },
+  }}
+/>
+```
+
+Internal mode behavior:
+
+- Initial load shows the table skeleton.
+- Initial load failure shows an inline `Could not load rows` state with `Retry`.
+- Refresh failure keeps the last successful rows visible and calls `onError`.
+- `mode: "client"` expects the full row array and lets the table sort/filter/page in memory.
+- `mode: "server"` expects the current page and uses `totalRecords` for pagination.
+
+Keep using `onCellEdit`, `onRowSave`, `onAddRow`, and `onBulkDelete` for mutations.
+The table does not assume your write API; this lets you choose optimistic updates,
+rollback, toast notifications, and validation.
 
 ---
 
@@ -454,7 +533,11 @@ Mark a column non-exportable via `meta.exportable: false`.
 
 ## Server-side data
 
-Provide a controlled global filter and refetch on change:
+You can do server-side data in either mode.
+
+### Controlled server-side data
+
+Own the API call in your page and pass the result into the table:
 
 ```tsx
 const [q, setQ] = useState("")
@@ -474,7 +557,38 @@ const usersQuery = useQuery({
 />
 ```
 
-Pair with TanStack Query's pagination/cursor utilities for cursor-based grids.
+Pair this with TanStack Query's pagination/cursor utilities when you want query
+caching and mutation orchestration outside the grid.
+
+### Built-in server-side data
+
+Let the grid call your API by setting `dataSource.mode` to `"server"`:
+
+```tsx
+<DataTable<User>
+  columns={columns}
+  dataSource={{
+    mode: "server",
+    fetchRows: async (state) => {
+      const res = await fetch("/api/users/grid", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(state),
+      })
+
+      if (!res.ok) throw new Error("Users request failed")
+      return res.json() as Promise<{ rows: User[]; totalRecords: number }>
+    },
+    onError: (_error, context) => {
+      toast.error(context.message)
+    },
+  }}
+/>
+```
+
+`state` contains `pageIndex`, `pageSize`, `sorting`, `columnFilters`, and
+`globalFilter`. In server mode the table assumes the API already applied those
+operations and only renders the returned page.
 
 ---
 
@@ -482,8 +596,9 @@ Pair with TanStack Query's pagination/cursor utilities for cursor-based grids.
 
 | Prop                      | Type                                                       | Default                | Description                                            |
 | ------------------------- | ---------------------------------------------------------- | ---------------------- | ------------------------------------------------------ |
-| `data`                    | `TData[]`                                                  | —                      | Row data.                                              |
+| `data`                    | `TData[]`                                                  | `[]`                   | Controlled row data. Use this when fetching outside the table. |
 | `columns`                 | `ColumnDef<TData>[]`                                       | —                      | TanStack column definitions.                           |
+| `dataSource`              | `DataTableDataSource<TData>`                               | —                      | Optional internal fetcher for client/server data loading. |
 | `isLoading`               | `boolean`                                                  | `false`                | Initial skeleton state.                                |
 | `isFetching`              | `boolean`                                                  | `false`                | Background-refresh indicator.                          |
 | `onRefresh`               | `() => void`                                               | —                      | Refresh button handler.                                |
@@ -513,6 +628,26 @@ Pair with TanStack Query's pagination/cursor utilities for cursor-based grids.
 | `theme`                   | `DataTableTheme`                                           | inherits `:root`       | Per-instance CSS-variable overrides.                   |
 
 `TData` must extend `{ id: string \| number }`.
+
+```ts
+type DataTableDataSource<TData> = {
+  fetchRows: (params: {
+    pageIndex: number
+    pageSize: number
+    sorting: SortingState
+    columnFilters: ColumnFiltersState
+    globalFilter: string
+  }) => Promise<TData[] | { rows: TData[]; totalRecords?: number }>
+  mode?: "client" | "server"
+  enabled?: boolean
+  initialData?: TData[]
+  deps?: readonly unknown[]
+  onError?: (
+    error: unknown,
+    context: { type: "load" | "refresh"; message: string }
+  ) => void
+}
+```
 
 ---
 
