@@ -15,10 +15,12 @@
  *   • shadcn-compatible: token names match shadcn/ui's CSS variables exactly,
  *     so if you already have shadcn (or any compatible theme) defined on
  *     :root, *that* takes precedence and the grid blends in automatically.
+ *   • Tailwind v4 utility classes (`bg-popover`, `text-foreground`, etc.)
+ *     resolve automatically — see the @theme block below.
  *
  * Cascade design
  * --------------
- * All declarations below live inside the `dynostack-grid-defaults` cascade
+ * All variable values live inside the `dynostack-grid-defaults` cascade
  * layer. Any *unlayered* declaration in the consumer app (which is where
  * shadcn and most app CSS lives) automatically wins, regardless of import
  * order. This makes import order non-fragile — you cannot accidentally
@@ -30,6 +32,54 @@
  *     this file (@layer dynostack-grid-defaults)
  *   <lowest priority>
  */
+
+/* ─── Tailwind v4 token registration ──────────────────────────────────
+ * Tells Tailwind v4 to generate `bg-popover`, `text-foreground`,
+ * `border-border`, `rounded-lg`, etc. utility classes that resolve to our
+ * CSS variables. Without this, the bundled `className` strings inside the
+ * grid have no corresponding CSS rules in zero-config v4 projects, and
+ * overlays render with transparent backgrounds.
+ *
+ * Must be declared at the top level — Tailwind v4 processes `@theme`
+ * before cascade layers apply, and `@theme` inside `@layer` is not valid.
+ *
+ * Safe across stacks:
+ *   • Tailwind v4   → consumed normally, utilities generated.
+ *   • Tailwind v3   → unknown at-rule, silently ignored. (v3 users still
+ *                     need to map semantic colors in tailwind.config.js;
+ *                     see README → Tailwind setup.)
+ *   • Non-Tailwind  → unknown at-rule, ignored.
+ *   • shadcn consumer with their own @theme block → declarations merge.
+ *     Since we use the same shadcn token names, the values are identical
+ *     and there is no conflict.
+ * ─────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
 
 @layer dynostack-grid-defaults {
   :root {

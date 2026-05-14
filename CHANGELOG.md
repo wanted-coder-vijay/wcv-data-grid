@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] — 2026-05-14
+
+True zero-config for Tailwind v4 consumers.
+
+### Fixed
+
+- **Tailwind v4 utility classes resolve out of the box.** The shipped `styles.css` now declares a top-level `@theme inline { … }` block mapping every shadcn semantic token (`--color-background`, `--color-popover`, `--color-primary`, …) to the CSS variables the package already defined. Without this block, Tailwind v4 didn't generate `bg-popover`, `bg-card`, `text-foreground`, etc., so bundled `className` strings produced no styles — overlays in particular rendered with transparent backgrounds in projects that didn't have shadcn pre-installed.
+
+  Bare Tailwind v4 + Vite consumers can now drop the package in with three lines and zero `tailwind.config.js`:
+
+  ```css
+  @import "tailwindcss";
+  @source "../node_modules/@dynostack/react-grid/dist";
+  @import "@dynostack/react-grid/styles.css";
+  ```
+
+  shadcn consumers see no change — the `@theme` declarations match shadcn's own and merge cleanly. Tailwind v3 consumers were always required to map semantic colors in `tailwind.config.js`; v3 ignores `@theme` directives, so they're unaffected.
+
+### Docs
+
+- **Rewrote the README "Tailwind setup" section** as v4-first zero-config, with a separate v3 sub-section that links out to shadcn's manual color mapping.
+- Updated the "Why this just works" callout to mention the `@theme inline` registration alongside the existing cascade-layer explanation.
+
+---
+
 ## [0.3.0] — 2026-05-14
 
 Built-in View sheet, delete confirmation, and a portal-container fix that finally makes themes work everywhere — including overlays.
@@ -118,6 +143,7 @@ If you depended on `themePresets.violet` (or `emerald` / `amber`) only re-colori
 
 Initial public theming surface with five-token presets (`light`, `dark`, `emerald`, `violet`, `amber`) and a flat `theme` prop.
 
+[0.3.1]: https://github.com/wanted-coder-vijay/wcv-data-grid/releases/tag/v0.3.1
 [0.3.0]: https://github.com/wanted-coder-vijay/wcv-data-grid/releases/tag/v0.3.0
 [0.2.0]: https://github.com/wanted-coder-vijay/wcv-data-grid/releases/tag/v0.2.0
 [0.1.3]: https://github.com/wanted-coder-vijay/wcv-data-grid/releases/tag/v0.1.3

@@ -77,7 +77,28 @@ yarn add @dynostack/react-grid
 
 ## Tailwind setup
 
-The component ships Tailwind class names verbatim. Tell your Tailwind config to scan the package files:
+The component ships Tailwind class names verbatim, so your Tailwind build needs to know two things:
+
+1. **Where to scan** for the class strings inside the bundle.
+2. **Which semantic color tokens** (`bg-popover`, `bg-card`, `text-foreground`, …) exist.
+
+The package's `styles.css` registers the tokens for you via Tailwind v4's `@theme inline`. You only need to wire scanning.
+
+### Tailwind v4 — zero config
+
+```css
+/* your global stylesheet (e.g. src/index.css) */
+@import "tailwindcss";
+@source "../node_modules/@dynostack/react-grid/dist";
+@import "@dynostack/react-grid/styles.css";
+@import "@dynostack/react-grid/page.css";   /* optional: extend tokens to <body> */
+```
+
+That's the whole setup. No `tailwind.config.js`, no `@theme` block to copy-paste, no shadcn install required. Overlay surfaces (popovers, dropdowns, sheets, the row-actions menu) all render correctly out of the box.
+
+### Tailwind v3
+
+v3 doesn't read CSS `@theme` directives, so the semantic-color mapping has to live in your `tailwind.config.js`. The shadcn install guide for v3 covers the exact `theme.extend.colors` block you need — copy that, plus add the package's `dist` to your `content` array:
 
 ```js
 // tailwind.config.{js,ts}
@@ -86,10 +107,28 @@ export default {
     "./src/**/*.{ts,tsx}",
     "./node_modules/@dynostack/react-grid/dist/**/*.{js,mjs,cjs}",
   ],
+  theme: {
+    extend: {
+      colors: {
+        // copy the shadcn v3 color mapping here
+        // (background, foreground, card, popover, primary, secondary,
+        //  muted, accent, destructive, border, input, ring)
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        // … etc
+      },
+    },
+  },
 }
 ```
 
-> Tailwind v4? Add the same path to your `@source` directive instead.
+Then import `styles.css` as usual:
+
+```ts
+import "@dynostack/react-grid/styles.css"
+```
+
+> Starting a new project? **Use Tailwind v4.** The v4 path above is meaningfully simpler — the package handles token registration for you.
 
 ## Theme tokens
 
@@ -104,14 +143,21 @@ The grid is built on **shadcn/ui CSS variables**. It auto-adjusts to whatever th
 | Custom theme with non-shadcn names | Pass [`theme` prop](#theming) | Per-instance override mapped to shadcn vars. |
 | Want one grid to ignore the app theme | Pass `isolate` | Grid uses bundled defaults regardless of `:root`. |
 
-**Why this just works.** The bundled `styles.css` declares its defaults inside the `dynostack-grid-defaults` cascade layer. Any unlayered consumer rule (which is where shadcn and most app CSS lives) automatically wins — import order doesn't matter, and you can't accidentally overwrite your app's theme by importing the grid's stylesheet.
+**Why this just works.** The bundled `styles.css`:
 
-### Minimal install
+1. **Registers Tailwind v4 utility tokens** via a top-level `@theme inline` block — so `bg-popover`, `text-foreground`, `border-border`, etc. resolve to your tokens without any consumer-side `@theme` block.
+2. **Declares variable values inside the `dynostack-grid-defaults` cascade layer** — any unlayered consumer rule (which is where shadcn and most app CSS lives) automatically wins, regardless of import order. You can't accidentally overwrite your app's theme by importing the grid's stylesheet.
 
-```ts
-// main.tsx — once per app
-import "@dynostack/react-grid/styles.css"
+### Minimal install (Tailwind v4)
+
+```css
+/* your global stylesheet */
+@import "tailwindcss";
+@source "../node_modules/@dynostack/react-grid/dist";
+@import "@dynostack/react-grid/styles.css";
 ```
+
+See the [Tailwind setup](#tailwind-setup) section for v3.
 
 ### Optional: extend the theme to the page
 
