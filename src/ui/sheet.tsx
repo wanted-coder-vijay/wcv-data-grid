@@ -39,9 +39,9 @@ type SheetSide = "right" | "left" | "top" | "bottom"
 
 const SIDE_CLASS: Record<SheetSide, string> = {
   right:
-    "right-0 top-0 h-full w-3/4 max-w-md border-l data-closed:slide-out-to-right data-open:slide-in-from-right",
+    "right-0 top-0 h-full w-full border-l sm:w-[min(48rem,calc(100vw-2rem))] data-closed:slide-out-to-right data-open:slide-in-from-right",
   left:
-    "left-0 top-0 h-full w-3/4 max-w-md border-r data-closed:slide-out-to-left data-open:slide-in-from-left",
+    "left-0 top-0 h-full w-full border-r sm:w-[min(48rem,calc(100vw-2rem))] data-closed:slide-out-to-left data-open:slide-in-from-left",
   top:
     "left-0 top-0 w-full max-h-[80vh] border-b data-closed:slide-out-to-top data-open:slide-in-from-top",
   bottom:

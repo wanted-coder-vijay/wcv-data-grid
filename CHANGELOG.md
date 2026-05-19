@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] - 2026-05-19
+
+Clarifies the row Details panel density behavior and keeps destructive confirmations scoped to the grid they belong to.
+
+### Changed
+
+- **Details panel density now matches the labels.** The built-in View sheet uses `compact` for a 3-column scanning layout, `relaxed` for a 2-column balanced layout, and `comfy` for a 1-column roomy layout.
+- **Details panel is wider on desktop.** Right and left sheets now use a wider responsive desktop width so multi-column layouts have enough room for real row values.
+
+### Fixed
+
+- **Delete confirmation is scoped to the table.** The confirmation overlay now covers only the DataTable instance instead of blurring the entire app or browser viewport.
+- **Built-in delete no longer falls through to `onRowAction("delete")`.** The grid opens the confirmation flow first and only calls `onDelete` after the user confirms.
+
+### Docs
+
+- Updated the View sheet docs to describe `Compact`, `Relaxed`, and `Comfy` as layout-density presets.
+- Updated delete-confirmation guidance to recommend `onDelete` for the built-in row delete action and reserve `onRowAction` for non-delete side effects and custom actions.
+
+---
+
 ## [0.3.1] — 2026-05-14
 
 True zero-config for Tailwind v4 consumers.

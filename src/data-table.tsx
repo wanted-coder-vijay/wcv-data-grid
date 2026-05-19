@@ -314,6 +314,7 @@ function ActionsCellHost<TData>({ row }: CellContext<TData, unknown>) {
           onView?.(row.original)
         } else if (a === "delete") {
           onRequestDelete?.(row.original)
+          return
         }
         onRowAction?.(a, row.original)
       }}

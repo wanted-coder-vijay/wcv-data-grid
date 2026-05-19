@@ -31,7 +31,7 @@ export type ViewSheetLabels = {
 export type ViewSheetConfig<TData> = {
   /** Side of the screen to slide in from. Defaults to "right". */
   side?: SheetSide
-  /** Initial column count. Defaults to "compact" (1 column). */
+  /** Initial layout density. Defaults to "compact" (more fields per row). */
   defaultDensity?: ViewSheetDensity
   /** Hide the density tabs entirely if you want a fixed layout. */
   hideDensityTabs?: boolean
@@ -50,15 +50,21 @@ export type ViewSheetConfig<TData> = {
 }
 
 const COLS_CLASS: Record<ViewSheetDensity, string> = {
-  compact: "grid-cols-1",
+  compact: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
   relaxed: "grid-cols-1 sm:grid-cols-2",
-  comfy: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  comfy: "grid-cols-1",
+}
+
+const CARD_CLASS: Record<ViewSheetDensity, string> = {
+  compact: "gap-0.5 p-2.5",
+  relaxed: "gap-1 p-3",
+  comfy: "gap-1.5 p-4",
 }
 
 const DENSITY_ICON: Record<ViewSheetDensity, React.ReactNode> = {
-  compact: <ListIcon className="size-3.5" />,
+  compact: <LayoutGridIcon className="size-3.5" />,
   relaxed: <Rows3Icon className="size-3.5" />,
-  comfy: <LayoutGridIcon className="size-3.5" />,
+  comfy: <ListIcon className="size-3.5" />,
 }
 
 export function DataTableViewSheet<TData>({
@@ -165,12 +171,15 @@ export function DataTableViewSheet<TData>({
             return (
               <div
                 key={colId}
-                className="flex flex-col gap-0.5 rounded-md border bg-card p-2.5"
+                className={cn(
+                  "flex min-w-0 flex-col rounded-md border bg-card",
+                  CARD_CLASS[density]
+                )}
               >
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {headerLabel}
                 </span>
-                <span className="text-sm text-foreground break-words">
+                <span className="break-words text-sm text-foreground">
                   {rendered}
                 </span>
               </div>

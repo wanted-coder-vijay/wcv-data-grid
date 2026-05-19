@@ -26,6 +26,8 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 - **Selection + bulk actions** — pinned `__select` column with select-all, clear, bulk delete
 - **Expandable rows** — provide a `renderSubRow` panel or use TanStack's nested `getSubRows`
 - **CSV / Excel export** — selection-aware (export selected vs. all)
+- **Built-in row Details panel** — `View` opens a scoped sheet with compact, relaxed, and comfy field layouts
+- **Scoped delete confirmation** — row and bulk delete confirmations stay inside the table instead of covering the entire app
 - **Theming that just works** — shadcn-compatible CSS variables, automatic OS dark-mode follow, cascade-layered defaults that never overwrite your app theme, full-repaint moded presets (`violet`, `emerald`, `amber`, `rose`, `sky`, `slate`, …), `buildPreset(hue)` for custom hues, and `isolate` to opt out of inheriting the app theme
 - **Density** — `compact` · `default` · `comfortable`
 - **i18n / labels** — every visible string is overridable
@@ -613,7 +615,7 @@ The set filter automatically derives unique values from the visible rows when `s
 Selection is on by default (`enableSelection: true`). When any row is selected the toolbar swaps in:
 
 - A `<count> selected` badge
-- `Delete` button → wires to `onBulkDelete?(rows)`
+- `Delete` button → opens the confirmation dialog first, then calls `onBulkDelete?(rows)` after confirm
 - `Clear` button → resets selection
 
 ```tsx
@@ -660,7 +662,15 @@ Mark a column non-exportable via `meta.exportable: false`.
 
 ## View sheet
 
-Click the row action "View" → a right-side `Sheet` slides in showing every visible column as a `{Label}: {value}` card. The user can switch layout density inline (Compact 1 col / Relaxed 2 col / Comfy 3 col).
+Click the row action "View" → a right-side `Sheet` slides in showing every visible column as a `{Label}: {value}` card. The user can switch layout density inline:
+
+| Option | Layout | Intended use |
+| --- | --- | --- |
+| `Compact` | 3 columns, tighter cards | Scan more fields at once. |
+| `Relaxed` | 2 columns, medium spacing | Balanced default for mixed values. |
+| `Comfy` | 1 column, roomier cards | Read long values without cramped wrapping. |
+
+The sheet is responsive and wider on desktop so the multi-column modes have enough room for real row data.
 
 Works out of the box with no props. Customize via `viewSheet`:
 
@@ -668,7 +678,7 @@ Works out of the box with no props. Customize via `viewSheet`:
 <DataTable
   viewSheet={{
     side: "right",                              // or "left"
-    defaultDensity: "relaxed",                  // initial column count
+    defaultDensity: "relaxed",                  // initial layout density
     hideDensityTabs: true,                      // hide the layout picker
     fields: ["name", "email", "role"],          // limit / reorder shown columns
     renderField: ({ column, value, row }) =>    // override how a value renders
@@ -678,7 +688,7 @@ Works out of the box with no props. Customize via `viewSheet`:
       title: (row) => `${row.name} (${row.role})`,
       description: (row) => `Joined ${row.joinedAt}`,
       emptyValue: "—",
-      density: { compact: "1 col", relaxed: "2 cols", comfy: "3 cols" },
+      density: { compact: "3 cols", relaxed: "2 cols", comfy: "1 col" },
     },
   }}
   onView={(row) => track("user.view", row)}   // optional side-effect
@@ -699,6 +709,8 @@ Disable the built-in sheet entirely:
 
 Both the row-action "Delete" and the toolbar "Bulk delete" open a confirmation `AlertDialog` by default. The user must confirm before `onDelete` or `onBulkDelete` fires.
 
+The dialog is mounted inside the DataTable portal container, so its blur / dim overlay covers only that table instance. It does not block or blur the rest of the page.
+
 ```tsx
 <DataTable
   onDelete={(row) => api.deleteUser(row.id)}
@@ -715,6 +727,8 @@ Both the row-action "Delete" and the toolbar "Bulk delete" open a confirmation `
   }}
 />
 ```
+
+Use `onDelete` for the built-in row delete action. Do not put the actual delete mutation in `onRowAction("delete")`, because the built-in delete action is handled by the confirmation flow.
 
 Skip the dialog (fire immediately):
 
@@ -740,10 +754,10 @@ Skip the dialog (fire immediately):
     { id: "archive", label: "Archive", icon: <ArchiveIcon /> },
   ]}
   onRowAction={(action, row) => {
-    if (action === "delete") deleteMutation.mutate([row.id])
     if (action === "suspend") saveMutation.mutate({ ...row, status: "suspended" })
     // ...
   }}
+  onDelete={(row) => deleteMutation.mutate([row.id])}
 />
 ```
 
