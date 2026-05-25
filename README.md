@@ -20,28 +20,28 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 ## Showcase
 
 <p align="center">
-  <img src="../../public/table-images/Screenshot%202026-05-25%20233937.png" alt="React data grid with toolbar, sorting, filters, pagination, export, and add-row controls" width="100%" />
+  <img src="public/table-images/Screenshot%202026-05-25%20233937.png" alt="React data grid with toolbar, sorting, filters, pagination, export, and add-row controls" width="100%" />
 </p>
 
 | Selection + bulk actions | Column menu |
 | --- | --- |
-| <img src="../../public/table-images/Screenshot%202026-05-25%20234013.png" alt="Rows selected with bulk delete and clear actions visible in the toolbar" width="100%" /> | <img src="../../public/table-images/Screenshot%202026-05-25%20234035.png" alt="Column menu with ascending sort, descending sort, pin, unpin, and hide column actions" width="100%" /> |
+| <img src="public/table-images/Screenshot%202026-05-25%20234013.png" alt="Rows selected with bulk delete and clear actions visible in the toolbar" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234035.png" alt="Column menu with ascending sort, descending sort, pin, unpin, and hide column actions" width="100%" /> |
 
 | Filter builder | Column visibility |
 | --- | --- |
-| <img src="../../public/table-images/Screenshot%202026-05-25%20234221.png" alt="Column filter builder with operator select, value input, add condition, clear, close, and apply controls" width="100%" /> | <img src="../../public/table-images/Screenshot%202026-05-25%20234246.png" alt="Column visibility popover with checked columns and reset control" width="100%" /> |
+| <img src="public/table-images/Screenshot%202026-05-25%20234221.png" alt="Column filter builder with operator select, value input, add condition, clear, close, and apply controls" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234246.png" alt="Column visibility popover with checked columns and reset control" width="100%" /> |
 
 | Export selected rows | Inline add and edit |
 | --- | --- |
-| <img src="../../public/table-images/Screenshot%202026-05-25%20234301.png" alt="Export menu for selected rows with CSV and Excel options" width="100%" /> | <img src="../../public/table-images/Screenshot%202026-05-25%20234313.png" alt="Inline add-row editing with text fields, select input, date input, save, and cancel controls" width="100%" /> |
+| <img src="public/table-images/Screenshot%202026-05-25%20234301.png" alt="Export menu for selected rows with CSV and Excel options" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234313.png" alt="Inline add-row editing with text fields, select input, date input, save, and cancel controls" width="100%" /> |
 
 | Row actions | Details panel |
 | --- | --- |
-| <img src="../../public/table-images/Screenshot%202026-05-25%20234410.png" alt="Row actions menu with view, edit, duplicate, and delete commands" width="100%" /> | <img src="../../public/table-images/Screenshot%202026-05-25%20234428.png" alt="Right-side details panel with compact, relaxed, and comfy density controls" width="100%" /> |
+| <img src="public/table-images/Screenshot%202026-05-25%20234410.png" alt="Row actions menu with view, edit, duplicate, and delete commands" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234428.png" alt="Right-side details panel with compact, relaxed, and comfy density controls" width="100%" /> |
 
 | Search |
 | --- |
-| <img src="../../public/table-images/Screenshot%202026-05-25%20234453.png" alt="Search input expanded in the table toolbar" width="100%" /> |
+| <img src="public/table-images/Screenshot%202026-05-25%20234453.png" alt="Search input expanded in the table toolbar" width="100%" /> |
 
 ## Highlights
 
