@@ -17,6 +17,32 @@ Built on [TanStack Table v8](https://tanstack.com/table) · [Radix UI](https://w
 
 A single `<DataTable />` component that gives you ag-grid–level functionality with a fraction of the API surface and a shadcn/ui aesthetic. Every behavior is opt-in via props — drop it in and it works; configure it and it scales.
 
+## Showcase
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20233937.png" alt="React data grid with toolbar, sorting, filters, pagination, export, and add-row controls" width="100%" />
+</p>
+
+| Selection + bulk actions | Column menu |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234013.png" alt="Rows selected with bulk delete and clear actions visible in the toolbar" width="100%" /> | <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234035.png" alt="Column menu with ascending sort, descending sort, pin, unpin, and hide column actions" width="100%" /> |
+
+| Filter builder | Column visibility |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234221.png" alt="Column filter builder with operator select, value input, add condition, clear, close, and apply controls" width="100%" /> | <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234246.png" alt="Column visibility popover with checked columns and reset control" width="100%" /> |
+
+| Export selected rows | Inline add and edit |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234301.png" alt="Export menu for selected rows with CSV and Excel options" width="100%" /> | <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234313.png" alt="Inline add-row editing with text fields, select input, date input, save, and cancel controls" width="100%" /> |
+
+| Row actions | Details panel |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234410.png" alt="Row actions menu with view, edit, duplicate, and delete commands" width="100%" /> | <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234428.png" alt="Right-side details panel with compact, relaxed, and comfy density controls" width="100%" /> |
+
+| Search |
+| --- |
+| <img src="https://raw.githubusercontent.com/wanted-coder-vijay/wcv-data-grid/master/public/table-images/Screenshot%202026-05-25%20234453.png" alt="Search input expanded in the table toolbar" width="100%" /> |
+
 ## Highlights
 
 - **Filters that actually filter** — text, number, date with operators (`contains`, `not contains`, `equals`, `before`, `after`, `in range`, `blank`, `not blank`, …), AND/OR combine of two conditions, and a set filter with search + select-all
@@ -39,6 +65,7 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 ## Table of contents
 
 - [Install](#install)
+- [Showcase](#showcase)
 - [Tailwind setup](#tailwind-setup)
 - [Theme tokens](#theme-tokens)
 - [Quick start](#quick-start)
