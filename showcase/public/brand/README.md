@@ -2,7 +2,7 @@
 
 Dynostack is the parent platform. Grid is its first shipped product, not the limit of the brand.
 
-The mark is a layered D with an internal forward signal. Grid keeps the same outer silhouette and replaces the signal with four data tiles. Future products should share the outer mark and typography; a distinct inner symbol identifies each product.
+The mark is a layered D with an internal forward signal. Grid keeps the same outer silhouette and replaces the signal with four data tiles. Both inner symbols begin flush with the D silhouette at x=10 and share the vertical center at y=34. Future products should share the outer mark and typography; a distinct inner symbol identifies each product.
 
 Source geometry: `identity.json`. Generate deployable assets with `node scripts/brand-assets.mjs`. Assets live in `showcase/public/brand` and have transparent backgrounds. `light` filenames mean dark ink for light backgrounds; `dark` filenames mean pale ink for dark backgrounds. SVG wordmarks use editable text with Arial/Helvetica fallbacks; the website uses Geist for its live wordmark.
 
