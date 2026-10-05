@@ -1000,6 +1000,11 @@ function Docs() {
     const observer = new ResizeObserver(schedule)
     const content = document.querySelector(".docs-content")
     if (content) observer.observe(content)
+    // The browser may resolve the hash before React renders the sections.
+    const initialAnchor = sections.find(
+      (section) => section && `#${section.id}` === location.hash
+    )
+    initialAnchor?.scrollIntoView({ behavior: "instant", block: "start" })
     schedule()
     return () => {
       cancelAnimationFrame(frame)
