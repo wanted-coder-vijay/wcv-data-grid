@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added Dynostack parent and Grid product identities, downloadable SVG brand assets, and a home page ready for future products.
 - Added a loading-state playground control, included in shared configurations and generated code.
+- Fixed documentation navigation to track the visible section during scrolling, including direct anchors and the bottom of the page.
 - Removed heavy outlines and focus rings from inline cell editors while retaining a subtle focus border.
 
 ## [0.5.0] - 2026-10-06

@@ -1973,3 +1973,8 @@ pre {
   outline: none;
   outline-offset: 0;
 }
+
+.on-this-page a.active {
+  color: var(--ink);
+  font-weight: 600;
+}

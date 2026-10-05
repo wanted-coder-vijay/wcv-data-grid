@@ -968,6 +968,47 @@ const docsSections = [
 ]
 function Docs() {
   const [active, setActive] = useState("Installation")
+  useEffect(() => {
+    const sections = docsSections.map((_, i) =>
+      document.getElementById(`doc-${i}`)
+    )
+    let frame = 0
+    const updateActive = () => {
+      frame = 0
+      const readingLine = Math.min(160, window.innerHeight * 0.2)
+      let index = 0
+      sections.forEach((section, i) => {
+        const heading = section?.querySelector("h2")
+        if (heading && heading.getBoundingClientRect().top <= readingLine)
+          index = i
+      })
+      // The last heading may never reach the reading line on a tall screen.
+      if (
+        window.scrollY > 0 &&
+        window.scrollY + window.innerHeight >=
+          document.documentElement.scrollHeight - 2
+      )
+        index = docsSections.length - 1
+      setActive(docsSections[index])
+    }
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(updateActive)
+    }
+    window.addEventListener("scroll", schedule, { passive: true })
+    window.addEventListener("resize", schedule)
+    window.addEventListener("hashchange", schedule)
+    const observer = new ResizeObserver(schedule)
+    const content = document.querySelector(".docs-content")
+    if (content) observer.observe(content)
+    schedule()
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener("scroll", schedule)
+      window.removeEventListener("resize", schedule)
+      window.removeEventListener("hashchange", schedule)
+      observer.disconnect()
+    }
+  }, [])
   return (
     <main className="docs-layout">
       <aside className="docs-nav">
@@ -978,7 +1019,7 @@ function Docs() {
             className={active === s ? "active" : ""}
             key={s}
             href={`#doc-${i}`}
-            onClick={() => setActive(s)}
+            aria-current={active === s ? "location" : undefined}
           >
             {s}
           </a>
@@ -1223,7 +1264,12 @@ function Docs() {
       <aside className="on-this-page">
         <span>On this page</span>
         {docsSections.map((s, i) => (
-          <a key={s} href={`#doc-${i}`}>
+          <a
+            key={s}
+            href={`#doc-${i}`}
+            className={active === s ? "active" : ""}
+            aria-current={active === s ? "location" : undefined}
+          >
             {s}
           </a>
         ))}
