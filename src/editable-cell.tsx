@@ -61,8 +61,7 @@ export function EditableCell<TData, TValue>({
       <div
         className={cn(
           "flex h-7 items-center gap-1.5 rounded px-1.5 text-sm",
-          isEditable &&
-            "cursor-text outline-1 outline-transparent transition-colors hover:bg-muted/60 hover:outline-border",
+          isEditable && "cursor-text transition-colors hover:bg-muted/60",
           align === "right" && "justify-end",
           align === "center" && "justify-center"
         )}
@@ -74,7 +73,9 @@ export function EditableCell<TData, TValue>({
     )
   }
 
-  const commit = (value: unknown) => { if (isEditable) onCommit(value) }
+  const commit = (value: unknown) => {
+    if (isEditable) onCommit(value)
+  }
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") commit(local)
     else if (e.key === "Escape") onCancel()
@@ -85,6 +86,7 @@ export function EditableCell<TData, TValue>({
     if (!autoOpen) {
       return (
         <select
+          data-cell-editor=""
           value={String(local ?? "")}
           onChange={(e) => {
             setLocal(e.target.value)
@@ -111,7 +113,11 @@ export function EditableCell<TData, TValue>({
         value={String(local ?? "")}
         onValueChange={(v) => commit(v)}
       >
-        <SelectTrigger size="sm" className="h-7 w-full text-xs">
+        <SelectTrigger
+          data-cell-editor=""
+          size="sm"
+          className="h-7 w-full text-xs focus-visible:ring-0"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -129,6 +135,8 @@ export function EditableCell<TData, TValue>({
     return (
       <div className="flex h-7 items-center justify-center">
         <Checkbox
+          data-cell-editor=""
+          className="focus-visible:ring-0"
           checked={!!local}
           onCheckedChange={(c) => commit(!!c)}
           autoFocus
@@ -139,13 +147,14 @@ export function EditableCell<TData, TValue>({
 
   return (
     <Input
+      data-cell-editor=""
       ref={inputRef}
       type={
         editor === "number" || editor === "currency"
           ? "number"
           : editor === "date"
-          ? "date"
-          : "text"
+            ? "date"
+            : "text"
       }
       value={local == null ? "" : String(local)}
       onChange={(e) => {
@@ -158,7 +167,7 @@ export function EditableCell<TData, TValue>({
       onBlur={() => commit(local)}
       onKeyDown={handleKey}
       className={cn(
-        "h-7 px-1.5 text-sm",
+        "h-7 px-1.5 text-sm focus-visible:ring-0",
         align === "right" && "text-right",
         align === "center" && "text-center"
       )}
@@ -169,7 +178,20 @@ export function EditableCell<TData, TValue>({
 function renderDisplay(
   value: unknown,
   editor: string,
-  meta?: { selectOptions?: { value: string; label: string }[]; badgeMap?: Partial<Record<string, "default" | "secondary" | "destructive" | "success" | "warning" | "outline">> }
+  meta?: {
+    selectOptions?: { value: string; label: string }[]
+    badgeMap?: Partial<
+      Record<
+        string,
+        | "default"
+        | "secondary"
+        | "destructive"
+        | "success"
+        | "warning"
+        | "outline"
+      >
+    >
+  }
 ) {
   if (value === null || value === undefined || value === "") {
     return <span className="text-muted-foreground/60">—</span>
@@ -187,12 +209,12 @@ function renderDisplay(
   }
   if (editor === "number") {
     const n = typeof value === "number" ? value : Number(value)
-    return Number.isFinite(n) ? new Intl.NumberFormat().format(n) : String(value)
+    return Number.isFinite(n)
+      ? new Intl.NumberFormat().format(n)
+      : String(value)
   }
   if (editor === "checkbox" || editor === "switch") {
-    return (
-      <Checkbox checked={!!value} disabled aria-label="value" />
-    )
+    return <Checkbox checked={!!value} disabled aria-label="value" />
   }
   if (editor === "select") {
     const opt = meta?.selectOptions?.find((o) => o.value === value)

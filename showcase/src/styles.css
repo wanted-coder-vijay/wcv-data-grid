@@ -1867,3 +1867,109 @@ pre {
     letter-spacing: -3px;
   }
 }
+.brand-icon {
+  width: 34px;
+  height: 36px;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 0;
+}
+.brand-product {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.dynostack-mark {
+  flex-shrink: 0;
+}
+.products-section {
+  max-width: 1200px;
+  margin: auto;
+  padding: 65px 25px 0;
+}
+.products-section h2 {
+  font-size: 34px;
+}
+.product-family {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.product-card {
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.product-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.product-status {
+  font-size: 10px;
+  color: var(--subtle);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 6px 10px;
+}
+.product-card h3 {
+  font-size: 25px;
+  font-weight: 550;
+  letter-spacing: -1px;
+  margin: 26px 0 14px;
+}
+.product-card h3 span {
+  color: var(--subtle);
+  font-weight: 400;
+}
+.product-card p {
+  max-width: 390px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--subtle);
+  margin-bottom: 25px;
+}
+.next-product {
+  background: transparent;
+  border-style: dashed;
+}
+.next-product .dynostack-mark {
+  color: var(--subtle);
+}
+.future-note {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--subtle);
+  padding: 11px 0;
+}
+@media (max-width: 760px) {
+  .product-family {
+    grid-template-columns: 1fr;
+  }
+  .products-section {
+    padding: 45px 20px 0;
+  }
+  .products-section h2 {
+    font-size: 27px;
+  }
+  .product-card {
+    padding: 26px;
+  }
+  .brand-product {
+    display: none;
+  }
+  .site-header {
+    gap: 12px;
+  }
+  .header-tools {
+    gap: 8px;
+  }
+}
+
+/* Cell editors use a subtle border instead of the page-wide focus outline. */
+[data-cell-editor]:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}

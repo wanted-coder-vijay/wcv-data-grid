@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dynostack — Brand kit</title>
+    <link rel="icon" href="/favicon.svg" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #090a0b;
+        color: #f4f5f7;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      a {
+        color: inherit;
+      }
+      header,
+      main,
+      footer {
+        max-width: 1160px;
+        margin: auto;
+        padding: 28px 30px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #292c2f;
+        align-items: center;
+      }
+      header a {
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+      }
+      header img {
+        width: 27px;
+        height: 29px;
+      }
+      h1 {
+        font-size: 45px;
+        letter-spacing: -2px;
+        font-weight: 600;
+        margin: 25px 0 15px;
+      }
+      p {
+        color: #9298a1;
+        font-size: 14px;
+        line-height: 1.8;
+        max-width: 650px;
+        margin-bottom: 30px;
+      }
+      .board {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid #292c2f;
+        border-radius: 6px;
+      }
+      h2 {
+        font-size: 24px;
+        font-weight: 500;
+        margin-top: 50px;
+        letter-spacing: -0.7px;
+      }
+      .downloads {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin: 25px 0;
+      }
+      .downloads section {
+        border: 1px solid #292c2f;
+        border-radius: 5px;
+        padding: 25px;
+      }
+      .downloads img {
+        height: 50px;
+        max-width: 100%;
+        display: block;
+        margin: 10px 0 25px;
+      }
+      .downloads h3 {
+        font-size: 15px;
+        font-weight: 500;
+      }
+      .downloads a {
+        font-size: 12px;
+        color: #bac4d3;
+        display: inline-block;
+        margin: 8px 16px 5px 0;
+        text-underline-offset: 4px;
+      }
+      .zip {
+        display: inline-flex;
+        padding: 12px 18px;
+        border-radius: 4px;
+        background: #f4f5f7;
+        color: #16181c;
+        font-size: 13px;
+        text-decoration: none;
+      }
+      .guidance {
+        border-top: 1px solid #292c2f;
+        padding-top: 25px;
+        margin-top: 35px;
+      }
+      footer {
+        color: #9298a1;
+        font-size: 11px;
+        border-top: 1px solid #292c2f;
+        padding-bottom: 35px;
+      }
+      a:focus-visible {
+        outline: 2px solid #96baff;
+        outline-offset: 5px;
+      }
+      @media (max-width: 650px) {
+        header,
+        main,
+        footer {
+          padding: 22px 20px;
+        }
+        h1 {
+          font-size: 34px;
+        }
+        .downloads {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="/"
+        ><img src="/brand/dynostack-mark-dark.svg" alt="" />dynostack</a
+      ><a href="/playground">Explore Grid ↗</a>
+    </header>
+    <main>
+      <h1>One identity. A growing stack.</h1>
+      <p>
+        Dynostack is the parent platform. Grid is the first product. Both share
+        a layered D silhouette, with a distinct center that gives each product
+        its own character.
+      </p>
+      <img
+        class="board"
+        src="/brand/identity-board.svg"
+        alt="Dynostack parent logo and Grid product logo, shown in both dark and light versions"
+      />
+      <h2>Download the logos</h2>
+      <p>
+        Eight scalable SVG assets with transparent backgrounds. Light variants
+        use dark ink; dark variants use pale ink.
+      </p>
+      <div class="downloads">
+        <section>
+          <h3>Dynostack</h3>
+          <img
+            src="/brand/dynostack-wordmark-dark.svg"
+            alt="Dynostack wordmark"
+          /><a download href="/brand/dynostack-mark-light.svg">Light mark</a
+          ><a download href="/brand/dynostack-mark-dark.svg">Dark mark</a
+          ><a download href="/brand/dynostack-wordmark-light.svg"
+            >Light wordmark</a
+          ><a download href="/brand/dynostack-wordmark-dark.svg"
+            >Dark wordmark</a
+          >
+        </section>
+        <section>
+          <h3>Dynostack Grid</h3>
+          <img
+            src="/brand/dynostack-grid-wordmark-dark.svg"
+            alt="Dynostack Grid wordmark"
+          /><a download href="/brand/dynostack-grid-mark-light.svg"
+            >Light mark</a
+          ><a download href="/brand/dynostack-grid-mark-dark.svg">Dark mark</a
+          ><a download href="/brand/dynostack-grid-wordmark-light.svg"
+            >Light wordmark</a
+          ><a download href="/brand/dynostack-grid-wordmark-dark.svg"
+            >Dark wordmark</a
+          >
+        </section>
+      </div>
+      <a class="zip" download href="/brand/dynostack-brand-kit.zip"
+        >Download the complete brand kit</a
+      >
+      <div class="guidance">
+        <p>
+          Use the parent mark for Dynostack as a whole, and the tiled mark for
+          Grid. Keep one quarter of the mark's width clear on all sides. Do not
+          stretch or rotate the marks. Wordmark SVGs use editable type with
+          Arial/Helvetica fallbacks.
+        </p>
+      </div>
+    </main>
+    <footer>Dynostack / Design engineered for what comes next.</footer>
+  </body>
+</html>

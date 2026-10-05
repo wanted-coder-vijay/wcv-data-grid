@@ -1,5 +1,10 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://dynostack-react-grid.vercel.app/brand/dynostack-grid-wordmark-dark.svg">
+  <img src="https://dynostack-react-grid.vercel.app/brand/dynostack-grid-wordmark-light.svg" alt="Dynostack Grid" width="360">
+</picture>
+
 # @dynostack/react-grid
 
 **Enterprise-grade React data grid. Drop-in.**
@@ -20,6 +25,8 @@ Try every feature on real sample data, customize themes and density, share a con
 ---
 
 A single `<DataTable />` component that gives you ag-grid–level functionality with a fraction of the API surface and a shadcn/ui aesthetic. Every behavior is opt-in via props — drop it in and it works; configure it and it scales.
+
+Dynostack is a growing family of tools. Grid is the first product, with a shared brand system designed for future modules. [Download the Dynostack and Grid logos](https://dynostack-react-grid.vercel.app/brand.html).
 
 ## Showcase
 

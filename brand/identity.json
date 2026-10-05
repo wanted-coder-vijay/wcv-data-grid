@@ -1,0 +1,14 @@
+{
+  "name": "Dynostack",
+  "viewBox": "0 0 64 68",
+  "outerPaths": [
+    "M10 4H30C45 4 57 14 60 28H46C43 22 38 18 30 18H10Z",
+    "M10 50H30C38 50 43 46 46 40H60C57 54 45 64 30 64H10Z"
+  ],
+  "corePath": "M4 27H33L40 34L33 41H4Z",
+  "gridPaths": [
+    "M10 25H19V34H10Z", "M23 25H32V34H23Z",
+    "M10 38H19V47H10Z", "M23 38H32V47H23Z"
+  ],
+  "colors": { "ink": "#16181c", "paper": "#f4f5f7", "accent": "#96baff" }
+}

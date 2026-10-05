@@ -38,6 +38,8 @@ import {
   type DataTableModedTheme,
 } from "@dynostack/react-grid"
 import { createData, createColumns, type Project } from "./data"
+import { BrandMark } from "./Brand"
+import { products } from "./products"
 
 const featureNames: Record<keyof DataTableFeatures, string> = {
   search: "Global search",
@@ -61,6 +63,7 @@ type Config = {
   theme: DataTableThemeName
   selection: boolean
   editing: boolean
+  loading: boolean
   actions: boolean
   expansion: boolean
   striped: boolean
@@ -79,6 +82,7 @@ const defaults: Config = {
   theme: "graphite",
   selection: true,
   editing: true,
+  loading: false,
   actions: true,
   expansion: false,
   striped: false,
@@ -181,6 +185,7 @@ function Demo({
       <DataTable<Project>
         key={`${config.size}-${resetKey}`}
         data={rows}
+        isLoading={config.loading}
         columns={columns}
         ariaLabel="Project workspace"
         theme={theme}
@@ -435,18 +440,14 @@ function Home({
         <div className="hero-grid" aria-hidden="true" />
         <div className="hero-copy">
           <div className="release">
-            <span /> Open source. Built for React.
-            <span className="release-version">v0.5.0</span>
+            <span /> One stack. More possibilities.
+            <span className="release-version">v0.5.1</span>
           </div>
-          <h1>
-            Dynostack
-            <br />
-            Grid.
-          </h1>
+          <h1>Dynostack.</h1>
           <p>
-            Design engineered for your data.
-            <br className="desktop" /> A React grid that feels as good as it
-            works.
+            A growing toolkit for modern interfaces.
+            <br className="desktop" /> Start with Grid. More tools will join the
+            stack.
           </p>
           <div className="hero-actions">
             <a
@@ -457,7 +458,7 @@ function Home({
                 go("/playground")
               }}
             >
-              Explore the playground <ArrowUpRight size={17} />
+              Explore Grid <ArrowUpRight size={17} />
             </a>
             <a
               className="secondary-button"
@@ -478,6 +479,48 @@ function Home({
         </div>
         <SignalField animated={animated} />
         <HeroTable dark={dark} animated={animated} />
+      </section>
+      <section className="products-section" id="products">
+        <div className="section-intro">
+          <h2>Your next building block.</h2>
+          <p>
+            One shared design language.
+            <br />A platform with room to grow.
+          </p>
+        </div>
+        <div className="product-family">
+          {products.map((product) => (
+            <article className="product-card" key={product.id}>
+              <div className="product-heading">
+                <BrandMark grid size={46} />
+                <span className="product-status">Available now</span>
+              </div>
+              <h3>
+                <span>Dynostack</span> {product.name}
+              </h3>
+              <p>{product.description}</p>
+              <a
+                className="secondary-button"
+                href={product.href}
+                onClick={(e) => {
+                  e.preventDefault()
+                  go(product.href)
+                }}
+              >
+                Open playground <ArrowUpRight size={15} />
+              </a>
+            </article>
+          ))}
+          <article className="product-card next-product">
+            <BrandMark size={46} />
+            <h3>More in the stack.</h3>
+            <p>
+              Grid is our first product. This is where future Dynostack tools
+              will join the family.
+            </p>
+            <span className="future-note">Space for what comes next</span>
+          </article>
+        </div>
       </section>
       <section className="foundation">
         <span>Fits right into your stack</span>
@@ -590,7 +633,7 @@ function Home({
 }
 
 function configCode(c: Config) {
-  return `import { DataTable, ${c.custom ? "buildPreset" : "themePresets"} } from '@dynostack/react-grid'\n\n// Define rows and columns as shown in the Quick start docs.\nconst preset = ${c.custom ? `buildPreset(${c.hue})` : `themePresets.${c.theme}`}\n\n<DataTable\n  data={rows}\n  columns={columns}\n  theme={preset}\n  className="${c.dark ? "dark" : "light"}"\n  density="${c.density}"\n  isolate={${c.isolate}}\n  enableSelection={${c.selection}}\n  striped={${c.striped}}\n  stickyHeader={${c.sticky}}\n  maxHeight="520px"\n  ariaLabel="Project workspace"\n  initialPageSize={${c.size}}\n  pageSizeOptions={[5, 10, 20, 50, 100]}\n  features={${JSON.stringify(c.features, null, 2).replace(/\n/g, "\n  ")}}\n  rowActions={${JSON.stringify(c.actions ? (c.editing ? ["view", "edit", "duplicate", "delete"] : ["view", "duplicate", "delete"]) : [])}}${c.translated ? '\n  labels={{ search: "Rechercher…", addRow: "Ajouter", columns: "Colonnes", export: "Exporter", total: "Total", noResults: "Aucun résultat." }}' : ""}${c.expansion ? "\n  renderSubRow={(row) => <p>{row.name}</p>}" : ""}\n  onSelectionChange={setSelectedRows}${c.editing ? "\n  onCellEdit={(row, key, value) => setRows(previous => previous.map(item => item.id === row.id ? { ...item, [key]: value } : item))}\n  onRowSave={(row, draft) => setRows(previous => previous.some(item => item.id === row.id) ? previous.map(item => item.id === row.id ? { ...item, ...draft } : item) : [...previous, { ...row, ...draft }])}" : ""}\n  onDelete={(row) => setRows(previous => previous.filter(item => item.id !== row.id))}\n  onBulkDelete={(selected) => setRows(previous => previous.filter(item => !selected.some(row => row.id === item.id)))}\n  onRowAction={(action, row) => {\n    if (action === 'duplicate') setRows(previous => [...previous, { ...row, id: crypto.randomUUID() }])\n  }}${c.features.addRow ? '\n  onAddRow={() => ({ id: crypto.randomUUID(), name: "New project" })}' : ""}${c.features.refresh ? "\n  onRefresh={reloadRows}" : ""}\n/>\n\n// Editing is configured per column:\n// meta: { editor: 'text', isEditable: ${c.editing} }`
+  return `import { DataTable, ${c.custom ? "buildPreset" : "themePresets"} } from '@dynostack/react-grid'\n\n// Define rows and columns as shown in the Quick start docs.\nconst preset = ${c.custom ? `buildPreset(${c.hue})` : `themePresets.${c.theme}`}\n\n<DataTable\n  data={rows}\n  columns={columns}\n  isLoading={${c.loading}}\n  theme={preset}\n  className="${c.dark ? "dark" : "light"}"\n  density="${c.density}"\n  isolate={${c.isolate}}\n  enableSelection={${c.selection}}\n  striped={${c.striped}}\n  stickyHeader={${c.sticky}}\n  maxHeight="520px"\n  ariaLabel="Project workspace"\n  initialPageSize={${c.size}}\n  pageSizeOptions={[5, 10, 20, 50, 100]}\n  features={${JSON.stringify(c.features, null, 2).replace(/\n/g, "\n  ")}}\n  rowActions={${JSON.stringify(c.actions ? (c.editing ? ["view", "edit", "duplicate", "delete"] : ["view", "duplicate", "delete"]) : [])}}${c.translated ? '\n  labels={{ search: "Rechercher…", addRow: "Ajouter", columns: "Colonnes", export: "Exporter", total: "Total", noResults: "Aucun résultat." }}' : ""}${c.expansion ? "\n  renderSubRow={(row) => <p>{row.name}</p>}" : ""}\n  onSelectionChange={setSelectedRows}${c.editing ? "\n  onCellEdit={(row, key, value) => setRows(previous => previous.map(item => item.id === row.id ? { ...item, [key]: value } : item))}\n  onRowSave={(row, draft) => setRows(previous => previous.some(item => item.id === row.id) ? previous.map(item => item.id === row.id ? { ...item, ...draft } : item) : [...previous, { ...row, ...draft }])}" : ""}\n  onDelete={(row) => setRows(previous => previous.filter(item => item.id !== row.id))}\n  onBulkDelete={(selected) => setRows(previous => previous.filter(item => !selected.some(row => row.id === item.id)))}\n  onRowAction={(action, row) => {\n    if (action === 'duplicate') setRows(previous => [...previous, { ...row, id: crypto.randomUUID() }])\n  }}${c.features.addRow ? '\n  onAddRow={() => ({ id: crypto.randomUUID(), name: "New project" })}' : ""}${c.features.refresh ? "\n  onRefresh={reloadRows}" : ""}\n/>\n\n// Editing is configured per column:\n// meta: { editor: 'text', isEditable: ${c.editing} }`
 }
 function Playground({ dark }: { dark: boolean }) {
   useEffect(() => {
@@ -610,6 +653,7 @@ function Playground({ dark }: { dark: boolean }) {
       for (const key of [
         "selection",
         "editing",
+        "loading",
         "actions",
         "expansion",
         "striped",
@@ -802,6 +846,7 @@ function Playground({ dark }: { dark: boolean }) {
               [
                 ["selection", "Row selection"],
                 ["editing", "Inline editing"],
+                ["loading", "Loading state"],
                 ["actions", "Row action menu"],
                 ["expansion", "Expandable details"],
                 ["translated", "French toolbar labels"],
@@ -1233,15 +1278,22 @@ export default function App() {
           }}
         >
           <span className="brand-icon">
-            <Grid2X2 size={20} />
+            <BrandMark size={32} />
           </span>
           dynostack
-          <span className="brand-divider" />{" "}
-          <span className="brand-product">Grid</span>
+          {route !== "home" && (
+            <>
+              <span className="brand-divider" />{" "}
+              <span className="brand-product">
+                <BrandMark grid size={18} />
+                Grid
+              </span>
+            </>
+          )}
         </a>
         <nav aria-label="Main navigation">
           {[
-            ["/", "Overview", "home"],
+            ["/", "Products", "home"],
             ["/playground", "Playground", "playground"],
             ["/docs", "Documentation", "docs"],
           ].map(([url, title, key]) => (
@@ -1310,7 +1362,7 @@ export default function App() {
             go("/")
           }}
         >
-          <Grid2X2 size={18} /> dynostack Grid
+          <BrandMark size={24} /> dynostack
         </a>
         <span>Built for builders. Apache 2.0 licensed.</span>
         <a href="https://www.npmjs.com/package/@dynostack/react-grid">
@@ -1318,6 +1370,9 @@ export default function App() {
         </a>
         <a href={repo}>
           GitHub <ArrowUpRight size={13} />
+        </a>
+        <a href="/brand.html">
+          Brand kit <ArrowUpRight size={13} />
         </a>
       </footer>
     </>

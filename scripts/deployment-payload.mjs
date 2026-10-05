@@ -18,6 +18,9 @@ function walk(dir) {
 }
 walk(path.join(root, "src"))
 walk(path.join(root, "showcase", "src"))
+walk(path.join(root, "brand"))
+walk(path.join(root, "showcase", "public", "brand"))
+add("showcase/public/brand.html")
 for (const file of [
   "package.json",
   "package-lock.json",
