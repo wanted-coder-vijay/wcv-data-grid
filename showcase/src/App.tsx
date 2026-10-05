@@ -975,7 +975,7 @@ function Docs() {
     let frame = 0
     const updateActive = () => {
       frame = 0
-      const readingLine = Math.min(160, window.innerHeight * 0.2)
+      const readingLine = Math.min(160, window.innerHeight * 0.4)
       let index = 0
       sections.forEach((section, i) => {
         const heading = section?.querySelector("h2")
