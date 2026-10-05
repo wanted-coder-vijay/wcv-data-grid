@@ -54,7 +54,7 @@ export type {
   SetFilter,
 } from "./filters"
 
-export { exportToCsv, exportToExcel } from "./export"
+export { exportToCsv, exportToExcel, sanitizeSpreadsheetValue } from "./export"
 
 export {
   themeToStyle,

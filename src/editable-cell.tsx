@@ -55,7 +55,7 @@ export function EditableCell<TData, TValue>({
   })()
 
   // Display mode
-  if (!isEditing) {
+  if (!isEditing || !isEditable) {
     const display = renderDisplay(initial, editor, meta)
     return (
       <div
@@ -74,7 +74,7 @@ export function EditableCell<TData, TValue>({
     )
   }
 
-  const commit = (value: unknown) => onCommit(value)
+  const commit = (value: unknown) => { if (isEditable) onCommit(value) }
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") commit(local)
     else if (e.key === "Escape") onCancel()

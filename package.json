@@ -1,6 +1,6 @@
 {
   "name": "@dynostack/react-grid",
-  "version": "0.3.2",
+  "version": "0.5.0",
   "description": "Enterprise-grade React DataGrid on TanStack + Radix + Tailwind, with operator-driven filters, inline editing, column pinning/resizing/reordering, CSV/Excel export, and full theme + i18n customization.",
   "license": "Apache-2.0",
   "author": "wanted-coder-vijay <drop.at.vijay@gmail.com>",
@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/wanted-coder-vijay/wcv-data-grid.git"
   },
-  "homepage": "https://github.com/wanted-coder-vijay/wcv-data-grid#readme",
+  "homepage": "https://dynostack-react-grid.vercel.app",
   "bugs": {
     "url": "https://github.com/wanted-coder-vijay/wcv-data-grid/issues"
   },
@@ -17,7 +17,7 @@
   },
   "type": "module",
   "sideEffects": [
-    "**/*.css"  
+    "**/*.css"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -39,6 +39,9 @@
     "NOTICE"
   ],
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "showcase:dev": "npm run dev --prefix showcase",
+    "showcase:build": "npm run build && npm run build --prefix showcase",
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
@@ -77,5 +80,8 @@
     "rimraf": "^6.0.1",
     "tsup": "^8.3.5",
     "typescript": "~5.9.3"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }

@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   type CellContext,
   type ColumnDef,
@@ -168,10 +176,8 @@ function getPinningStyles<TData>(
 ): React.CSSProperties {
   const isPinned = column.getIsPinned()
   if (!isPinned) return {}
-  const isLast =
-    isPinned === "left" && column.getIsLastColumn("left")
-  const isFirst =
-    isPinned === "right" && column.getIsFirstColumn("right")
+  const isLast = isPinned === "left" && column.getIsLastColumn("left")
+  const isFirst = isPinned === "right" && column.getIsFirstColumn("right")
   return {
     position: "sticky",
     left: isPinned === "left" ? `${column.getStart("left")}px` : undefined,
@@ -180,8 +186,8 @@ function getPinningStyles<TData>(
     boxShadow: isLast
       ? "1px 0 0 0 var(--border)"
       : isFirst
-      ? "-1px 0 0 0 var(--border)"
-      : undefined,
+        ? "-1px 0 0 0 var(--border)"
+        : undefined,
   }
 }
 
@@ -215,9 +221,8 @@ type EditingContextValue<TData> = {
   onRequestDelete?: (row: TData) => void
 }
 
-const DataTableEditingContext = createContext<EditingContextValue<unknown> | null>(
-  null
-)
+const DataTableEditingContext =
+  createContext<EditingContextValue<unknown> | null>(null)
 
 function useEditingContext<TData>(): EditingContextValue<TData> {
   const ctx = useContext(DataTableEditingContext)
@@ -225,18 +230,17 @@ function useEditingContext<TData>(): EditingContextValue<TData> {
   return ctx as unknown as EditingContextValue<TData>
 }
 
+function DefaultCellHost<TData, TValue>(ctx: CellContext<TData, TValue>) {
+  const value = ctx.getValue()
+  return value == null ? null : String(value)
+}
+
 function EditableCellHost<TData, TValue>(ctx: CellContext<TData, TValue>) {
-  const {
-    editingCell,
-    editingRowId,
-    setEditingCell,
-    setRowDraft,
-    onCellEdit,
-  } = useEditingContext<TData>()
+  const { editingCell, editingRowId, setEditingCell, setRowDraft, onCellEdit } =
+    useEditingContext<TData>()
   const colId = ctx.column.id
   const rowId = ctx.row.id
-  const isCellEdit =
-    editingCell?.rowId === rowId && editingCell.colId === colId
+  const isCellEdit = editingCell?.rowId === rowId && editingCell.colId === colId
   const isRowEdit = editingRowId === rowId
   const isEditing = isCellEdit || isRowEdit
 
@@ -387,6 +391,18 @@ export type DataTableProps<TData extends { id: string | number }> = {
 
   initialColumnPinning?: ColumnPinningState
   initialColumnVisibility?: VisibilityState
+  /** Initial sort order. */
+  initialSorting?: SortingState
+  /** Observe selected row objects (loaded rows only in server mode). */
+  onSelectionChange?: (rows: TData[]) => void
+  /** Accessible table name. */
+  ariaLabel?: string
+  /** Alternating row backgrounds. */
+  striped?: boolean
+  /** Keep headers visible inside a vertically constrained table. */
+  stickyHeader?: boolean
+  /** Scroll viewport height, e.g. "480px". */
+  maxHeight?: React.CSSProperties["maxHeight"]
 
   /** Optional controlled global filter (for cross-tab persistence). */
   globalFilter?: string
@@ -456,6 +472,8 @@ const DENSITY_CLASS: Record<DataTableDensity, string> = {
   comfortable: "[&_tbody_td]:py-2",
 }
 
+const EMPTY_DATA: never[] = []
+
 // ----- component --------------------------------------------------------
 
 export function DataTable<TData extends { id: string | number }>({
@@ -481,6 +499,12 @@ export function DataTable<TData extends { id: string | number }>({
   pageSizeOptions,
   initialColumnPinning,
   initialColumnVisibility,
+  initialSorting,
+  onSelectionChange,
+  ariaLabel = "Data table",
+  striped = false,
+  stickyHeader = false,
+  maxHeight,
   globalFilter: globalFilterProp,
   onGlobalFilterChange,
   className,
@@ -518,7 +542,7 @@ export function DataTable<TData extends { id: string | number }>({
     () => `dyno-grid-${rawInstanceId.replace(/[^a-zA-Z0-9]/g, "")}`,
     [rawInstanceId]
   )
-  const { lightStyle, darkCss } = useMemo(() => {
+  const { lightStyle, lightCss, darkCss } = useMemo(() => {
     const { light, dark } = splitTheme(theme)
     const lightTokens: DataTableTokens | undefined = isolate
       ? { ...ISOLATE_LIGHT_TOKENS, ...(light ?? {}) }
@@ -528,6 +552,7 @@ export function DataTable<TData extends { id: string | number }>({
       : dark
     return {
       lightStyle: tokensToStyle(lightTokens),
+      lightCss: tokensToCssBlock(lightTokens),
       darkCss: darkTokens ? tokensToCssBlock(darkTokens) : null,
     }
   }, [theme, isolate])
@@ -579,11 +604,13 @@ export function DataTable<TData extends { id: string | number }>({
   }
 
   // ----- state ----------------------------------------------------------
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [internalGlobalFilter, setInternalGlobalFilter] = useState("")
   const isControlledFilter = globalFilterProp !== undefined
-  const globalFilter = isControlledFilter ? globalFilterProp : internalGlobalFilter
+  const globalFilter = isControlledFilter
+    ? globalFilterProp
+    : internalGlobalFilter
   const setGlobalFilter = (v: string) => {
     if (isControlledFilter) onGlobalFilterChange?.(v)
     else setInternalGlobalFilter(v)
@@ -591,22 +618,24 @@ export function DataTable<TData extends { id: string | number }>({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     initialColumnVisibility ?? {}
   )
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>(
-    () => {
-      const base = initialColumnPinning ?? { left: [], right: [] }
-      const left = [...(base.left ?? [])]
-      const right = [...(base.right ?? [])]
-      const hasExpandColumn = !!(renderSubRow || getSubRows)
-      // Keep __expand glued to __select: if __select is pinned left and the
-      // table has an expand column, ensure __expand sits right after it on
-      // the left side regardless of user-supplied pin config.
-      if (hasExpandColumn && left.includes("__select") && !left.includes("__expand")) {
-        const idx = left.indexOf("__select")
-        left.splice(idx + 1, 0, "__expand")
-      }
-      return { left, right }
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>(() => {
+    const base = initialColumnPinning ?? { left: [], right: [] }
+    const left = [...(base.left ?? [])]
+    const right = [...(base.right ?? [])]
+    const hasExpandColumn = !!(renderSubRow || getSubRows)
+    // Keep __expand glued to __select: if __select is pinned left and the
+    // table has an expand column, ensure __expand sits right after it on
+    // the left side regardless of user-supplied pin config.
+    if (
+      hasExpandColumn &&
+      left.includes("__select") &&
+      !left.includes("__expand")
+    ) {
+      const idx = left.indexOf("__select")
+      left.splice(idx + 1, 0, "__expand")
     }
-  )
+    return { left, right }
+  })
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [expanded, setExpanded] = useState<ExpandedState>({})
@@ -626,7 +655,10 @@ export function DataTable<TData extends { id: string | number }>({
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0)
 
   // editing state — single cell or whole row
-  const [editingCell, setEditingCell] = useState<{ rowId: string; colId: string } | null>(null)
+  const [editingCell, setEditingCell] = useState<{
+    rowId: string
+    colId: string
+  } | null>(null)
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [rowDraft, setRowDraft] = useState<Record<string, Partial<TData>>>({})
 
@@ -659,7 +691,9 @@ export function DataTable<TData extends { id: string | number }>({
         const rows = Array.isArray(result) ? result : result.rows
         setSourceRows(rows)
         setSourceTotalRecords(
-          Array.isArray(result) ? rows.length : result.totalRecords ?? rows.length
+          Array.isArray(result)
+            ? rows.length
+            : (result.totalRecords ?? rows.length)
         )
       })
       .catch((error) => {
@@ -694,7 +728,7 @@ export function DataTable<TData extends { id: string | number }>({
     ...dataSourceDeps,
   ])
 
-  const baseData = dataSourceEnabled ? sourceRows : data ?? []
+  const baseData = dataSourceEnabled ? sourceRows : (data ?? EMPTY_DATA)
   const effectiveIsLoading = dataSourceEnabled ? sourceLoading : isLoading
   const effectiveIsFetching = dataSourceEnabled ? sourceFetching : isFetching
   const effectiveOnRefresh = dataSourceEnabled
@@ -709,7 +743,9 @@ export function DataTable<TData extends { id: string | number }>({
   )
   const effectiveTotalRecords =
     totalRecords ??
-    (dataSourceEnabled ? sourceTotalRecords ?? mergedData.length : mergedData.length)
+    (dataSourceEnabled
+      ? (sourceTotalRecords ?? mergedData.length)
+      : mergedData.length)
 
   // ----- column augmentation -------------------------------------------
   const augmentedColumns = useMemo<ColumnDef<TData>[]>(() => {
@@ -720,7 +756,8 @@ export function DataTable<TData extends { id: string | number }>({
 
       const original = col.cell
       const headerLabel =
-        meta?.label ?? (typeof col.header === "string" ? col.header : id ?? "")
+        meta?.label ??
+        (typeof col.header === "string" ? col.header : (id ?? ""))
 
       // Pick a default filterFn based on declared filterType. The user can
       // still override it by setting `filterFn` directly on the column.
@@ -742,7 +779,7 @@ export function DataTable<TData extends { id: string | number }>({
         }
       })()
 
-      return ({
+      return {
         ...col,
         filterFn: col.filterFn ?? defaultFilterFn,
         header:
@@ -754,8 +791,10 @@ export function DataTable<TData extends { id: string | number }>({
                   title={headerLabel}
                 />
               ),
-        cell: hasEditor ? (EditableCellHost as ColumnDef<TData>["cell"]) : original,
-      } as ColumnDef<TData>)
+        cell: hasEditor
+          ? (EditableCellHost as ColumnDef<TData>["cell"])
+          : (original ?? DefaultCellHost),
+      } as ColumnDef<TData>
     }
 
     const built: ColumnDef<TData>[] = columns.map(wrap)
@@ -803,8 +842,8 @@ export function DataTable<TData extends { id: string | number }>({
                 table.getIsAllPageRowsSelected()
                   ? true
                   : table.getIsSomePageRowsSelected()
-                  ? "indeterminate"
-                  : false
+                    ? "indeterminate"
+                    : false
               }
               onCheckedChange={(c) => table.toggleAllPageRowsSelected(!!c)}
               aria-label="Select all rows on this page"
@@ -847,7 +886,9 @@ export function DataTable<TData extends { id: string | number }>({
 
   // initial column order
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() =>
-    augmentedColumns.map((c) => c.id ?? (c as { accessorKey?: string }).accessorKey ?? "")
+    augmentedColumns.map(
+      (c) => c.id ?? (c as { accessorKey?: string }).accessorKey ?? ""
+    )
   )
   useEffect(() => {
     const next = augmentedColumns.map(
@@ -858,7 +899,8 @@ export function DataTable<TData extends { id: string | number }>({
       const existing = prev.filter((id) => next.includes(id))
       const added = next.filter((id) => !prev.includes(id))
       const final = [...existing, ...added]
-      return final.length === prev.length && final.every((v, i) => prev[i] === v)
+      return final.length === prev.length &&
+        final.every((v, i) => prev[i] === v)
         ? prev
         : final
     })
@@ -895,10 +937,10 @@ export function DataTable<TData extends { id: string | number }>({
     enableColumnFilters: f.filtering,
     enableColumnResizing: f.resizing,
     columnResizeMode: "onChange",
-    enableRowSelection: true,
+    enableRowSelection: enableSelection,
     enableExpanding: !!(renderSubRow || getSubRows),
     enablePinning: f.pinning,
-    manualPagination: isServerSideDataSource,
+    manualPagination: isServerSideDataSource || !f.pagination,
     manualSorting: isServerSideDataSource,
     manualFiltering: isServerSideDataSource,
     pageCount: isServerSideDataSource
@@ -912,7 +954,9 @@ export function DataTable<TData extends { id: string | number }>({
       return !!subs && subs.length > 0
     },
     globalFilterFn: (row, _columnId, value) => {
-      const q = String(value ?? "").toLowerCase().trim()
+      const q = String(value ?? "")
+        .toLowerCase()
+        .trim()
       if (!q) return true
       return row.getAllCells().some((cell) => {
         const v = cell.getValue()
@@ -1007,6 +1051,13 @@ export function DataTable<TData extends { id: string | number }>({
 
   // ----- render ---------------------------------------------------------
   const rows = table.getRowModel().rows
+  const selectionCallback = useRef(onSelectionChange)
+  selectionCallback.current = onSelectionChange
+  useEffect(() => {
+    selectionCallback.current?.(
+      table.getSelectedRowModel().flatRows.map((row) => row.original)
+    )
+  }, [rowSelection, mergedData, table])
   const visibleLeafCount = table.getVisibleLeafColumns().length
 
   const editingContextValue = useMemo<EditingContextValue<TData>>(
@@ -1047,205 +1098,225 @@ export function DataTable<TData extends { id: string | number }>({
 
   return (
     <PortalContainerContext.Provider value={gridRoot}>
-    <DataTableEditingContext.Provider
-      value={editingContextValue as unknown as EditingContextValue<unknown>}
-    >
-    <div
-      ref={setGridRoot}
-      data-dyno-grid={instanceId}
-      className={cn(
-        "relative flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm",
-        DENSITY_CLASS[density],
-        className
-      )}
-      style={lightStyle}
-    >
-      {darkCss && (
-        <style>
-          {`@media (prefers-color-scheme: dark){[data-dyno-grid="${instanceId}"]{${darkCss}}}`}
-          {`.dark [data-dyno-grid="${instanceId}"]{${darkCss}}`}
-          {`[data-dyno-grid="${instanceId}"].dark{${darkCss}}`}
-        </style>
-      )}
-      <DataTableToolbar
-        table={table}
-        totalRecords={effectiveTotalRecords}
-        isFetching={effectiveIsFetching}
-        onRefresh={f.refresh ? effectiveOnRefresh : undefined}
-        onAddRow={f.addRow ? handleAddRow : undefined}
-        onBulkDelete={onBulkDelete ? handleBulkDeleteRequest : undefined}
-        exportFileName={exportFileName}
-        globalFilter={globalFilter}
-        onGlobalFilterChange={(v) => {
-          setGlobalFilter(v)
-          table.setPageIndex(0)
-        }}
-        toolbarSlot={toolbarSlot}
-        features={f}
-        labels={labels}
-      />
-
-      <div className="relative w-full overflow-auto">
-        <table
-          className="w-full caption-bottom text-sm"
-          style={{
-            width: table.getCenterTotalSize() ? undefined : "100%",
-            minWidth: "100%",
-          }}
+      <DataTableEditingContext.Provider
+        value={editingContextValue as unknown as EditingContextValue<unknown>}
+      >
+        <div
+          ref={setGridRoot}
+          data-dyno-grid={instanceId}
+          className={cn(
+            "relative flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm",
+            DENSITY_CLASS[density],
+            className
+          )}
+          style={darkCss ? undefined : lightStyle}
         >
-          <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/70">
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b">
-                {hg.headers.map((header) => {
-                  const meta = header.column.columnDef.meta
-                  const isUtility =
-                    header.column.id === "__select" ||
-                    header.column.id === "__expand" ||
-                    header.column.id === "__actions"
-                  const isPinned = !!header.column.getIsPinned()
-                  const canReorder = !isUtility && f.reordering
-                  const isDropTarget =
-                    canReorder && dragOverColId === header.column.id
-                  const isBeingDragged =
-                    canReorder && activeReorderId === header.column.id
-                  return (
-                    <th
-                      key={header.id}
-                      colSpan={header.colSpan}
-                      data-col-id={header.column.id}
-                      onPointerDown={
-                        canReorder
-                          ? onHeaderPointerDown(header.column.id)
-                          : undefined
-                      }
-                      onPointerMove={canReorder ? onHeaderPointerMove : undefined}
-                      onPointerUp={canReorder ? onHeaderPointerUp : undefined}
-                      onPointerCancel={
-                        canReorder ? onHeaderPointerUp : undefined
-                      }
-                      style={{
-                        width: header.getSize(),
-                        ...getPinningStyles(header.column),
-                        ...(isPinned ? { zIndex: 2 } : {}),
-                      }}
-                      className={cn(
-                        "group/th relative h-9 px-2 text-left align-middle text-xs font-medium text-muted-foreground select-none",
-                        canReorder && "cursor-grab active:cursor-grabbing",
-                        isPinned && "bg-card",
-                        isBeingDragged && "opacity-50",
-                        isDropTarget &&
-                          "bg-primary/10 ring-2 ring-inset ring-primary/40",
-                        meta?.headerClassName
-                      )}
-                    >
-                      <div className="flex items-center gap-1">
-                        {canReorder && (
-                          <GripVerticalIcon
-                            className="-ml-1 size-3 shrink-0 text-muted-foreground/40 opacity-0 transition group-hover/th:opacity-100"
-                            aria-hidden="true"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(header.column.columnDef.header, header.getContext())}
-                        </div>
-                      </div>
+          {darkCss && (
+            <style>
+              {`[data-dyno-grid="${instanceId}"]{${lightCss}}`}
+              {`@media (prefers-color-scheme: dark){[data-dyno-grid="${instanceId}"]{${darkCss}}}`}
+              {`.dark [data-dyno-grid="${instanceId}"]{${darkCss}}`}
+              {`.light [data-dyno-grid="${instanceId}"]{${lightCss}}`}
+              {`[data-dyno-grid="${instanceId}"].dark{${darkCss}}`}
+              {`[data-dyno-grid="${instanceId}"].light{${lightCss}}`}
+            </style>
+          )}
+          <DataTableToolbar
+            table={table}
+            totalRecords={effectiveTotalRecords}
+            isFetching={effectiveIsFetching}
+            onRefresh={f.refresh ? effectiveOnRefresh : undefined}
+            onAddRow={f.addRow ? handleAddRow : undefined}
+            onBulkDelete={onBulkDelete ? handleBulkDeleteRequest : undefined}
+            exportFileName={exportFileName}
+            globalFilter={globalFilter}
+            onGlobalFilterChange={(v) => {
+              setGlobalFilter(v)
+              table.setPageIndex(0)
+            }}
+            toolbarSlot={toolbarSlot}
+            features={f}
+            labels={labels}
+          />
 
-                      {header.column.getCanResize() && (
-                        <span
-                          data-no-drag
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
-                          onDoubleClick={() => header.column.resetSize()}
+          <div className="relative w-full overflow-auto" style={{ maxHeight }}>
+            <table
+              aria-label={ariaLabel}
+              className={cn(
+                "w-full caption-bottom text-sm",
+                striped && "[&_tbody>tr:nth-child(even)]:bg-muted/25"
+              )}
+              style={{
+                width: table.getCenterTotalSize() ? undefined : "100%",
+                minWidth: "100%",
+              }}
+            >
+              <thead
+                className={cn("bg-card", stickyHeader && "sticky top-0 z-10")}
+              >
+                {table.getHeaderGroups().map((hg) => (
+                  <tr key={hg.id} className="border-b">
+                    {hg.headers.map((header) => {
+                      const meta = header.column.columnDef.meta
+                      const isUtility =
+                        header.column.id === "__select" ||
+                        header.column.id === "__expand" ||
+                        header.column.id === "__actions"
+                      const isPinned = !!header.column.getIsPinned()
+                      const canReorder = !isUtility && f.reordering
+                      const isDropTarget =
+                        canReorder && dragOverColId === header.column.id
+                      const isBeingDragged =
+                        canReorder && activeReorderId === header.column.id
+                      return (
+                        <th
+                          key={header.id}
+                          colSpan={header.colSpan}
+                          data-col-id={header.column.id}
+                          onPointerDown={
+                            canReorder
+                              ? onHeaderPointerDown(header.column.id)
+                              : undefined
+                          }
+                          onPointerMove={
+                            canReorder ? onHeaderPointerMove : undefined
+                          }
+                          onPointerUp={
+                            canReorder ? onHeaderPointerUp : undefined
+                          }
+                          onPointerCancel={
+                            canReorder ? onHeaderPointerUp : undefined
+                          }
+                          style={{
+                            width: header.getSize(),
+                            ...getPinningStyles(header.column),
+                            ...(isPinned ? { zIndex: 2 } : {}),
+                          }}
                           className={cn(
-                            "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none select-none bg-transparent transition-colors hover:bg-primary/40",
-                            header.column.getIsResizing() && "bg-primary"
+                            "group/th relative h-9 px-2 text-left align-middle text-xs font-medium text-muted-foreground select-none",
+                            canReorder && "cursor-grab active:cursor-grabbing",
+                            isPinned && "bg-card",
+                            isBeingDragged && "opacity-50",
+                            isDropTarget &&
+                              "bg-primary/10 ring-2 ring-primary/40 ring-inset",
+                            meta?.headerClassName
                           )}
-                        />
-                      )}
-                    </th>
-                  )
-                })}
-              </tr>
-            ))}
-          </thead>
+                        >
+                          <div className="flex items-center gap-1">
+                            {canReorder && (
+                              <GripVerticalIcon
+                                className="-ml-1 size-3 shrink-0 text-muted-foreground/40 opacity-0 transition group-hover/th:opacity-100"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                            </div>
+                          </div>
 
-          <tbody>
-            {effectiveIsLoading ? (
-              renderSkeleton(visibleLeafCount, pagination.pageSize)
-            ) : sourceError && rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={visibleLeafCount}
-                  className="h-32 text-center text-sm text-muted-foreground"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <span>{labels.loadError}</span>
-                    {effectiveOnRefresh && (
-                      <button
-                        type="button"
-                        onClick={effectiveOnRefresh}
-                        className="rounded-md border px-2 py-1 text-xs text-foreground hover:bg-muted"
-                      >
-                        {labels.retry}
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={visibleLeafCount}
-                  className="h-32 text-center text-sm text-muted-foreground"
-                >
-                  {globalFilter || columnFilters.length
-                    ? labels.noResults
-                    : labels.noData}
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <DataTableRow
-                  key={row.id}
-                  row={row}
-                  renderSubRow={renderSubRow}
-                  isRowEditing={editingRowId === row.id}
-                />
-              ))
+                          {header.column.getCanResize() && (
+                            <span
+                              data-no-drag
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onMouseDown={header.getResizeHandler()}
+                              onTouchStart={header.getResizeHandler()}
+                              onDoubleClick={() => header.column.resetSize()}
+                              className={cn(
+                                "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none bg-transparent transition-colors select-none hover:bg-primary/40",
+                                header.column.getIsResizing() && "bg-primary"
+                              )}
+                            />
+                          )}
+                        </th>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </thead>
+
+              <tbody>
+                {effectiveIsLoading ? (
+                  renderSkeleton(visibleLeafCount, pagination.pageSize)
+                ) : sourceError && rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={visibleLeafCount}
+                      className="h-32 text-center text-sm text-muted-foreground"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <span>{labels.loadError}</span>
+                        {effectiveOnRefresh && (
+                          <button
+                            type="button"
+                            onClick={effectiveOnRefresh}
+                            className="rounded-md border px-2 py-1 text-xs text-foreground hover:bg-muted"
+                          >
+                            {labels.retry}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={visibleLeafCount}
+                      className="h-32 text-center text-sm text-muted-foreground"
+                    >
+                      {globalFilter || columnFilters.length
+                        ? labels.noResults
+                        : labels.noData}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row) => (
+                    <DataTableRow
+                      key={row.id}
+                      row={row}
+                      renderSubRow={renderSubRow}
+                      isRowEditing={editingRowId === row.id}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {effectiveIsFetching && !effectiveIsLoading && (
+              <div className="pointer-events-none absolute top-1.5 right-2 flex items-center gap-1.5 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
+                <Loader2Icon className="size-3 animate-spin" />{" "}
+                {labels.refreshing}
+              </div>
             )}
-          </tbody>
-        </table>
-
-        {effectiveIsFetching && !effectiveIsLoading && (
-          <div className="pointer-events-none absolute top-1.5 right-2 flex items-center gap-1.5 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur">
-            <Loader2Icon className="size-3 animate-spin" /> {labels.refreshing}
           </div>
-        )}
-      </div>
 
-      {f.pagination && (
-        <DataTablePagination table={table} pageSizeOptions={pageSizeOptions} />
-      )}
+          {f.pagination && (
+            <DataTablePagination
+              table={table}
+              pageSizeOptions={pageSizeOptions}
+            />
+          )}
 
-      <DataTableViewSheet
-        table={table}
-        row={viewRow}
-        open={viewRow != null}
-        onOpenChange={(o) => !o && setViewRow(null)}
-        config={viewSheetConfig}
-      />
-      <DataTableConfirmDelete
-        open={confirmCtx != null}
-        onOpenChange={(o) => !o && setConfirmCtx(null)}
-        context={confirmCtx}
-        onConfirm={handleConfirmDelete}
-        config={confirmConfig}
-      />
-    </div>
-    </DataTableEditingContext.Provider>
+          <DataTableViewSheet
+            table={table}
+            row={viewRow}
+            open={viewRow != null}
+            onOpenChange={(o) => !o && setViewRow(null)}
+            config={viewSheetConfig}
+          />
+          <DataTableConfirmDelete
+            open={confirmCtx != null}
+            onOpenChange={(o) => !o && setConfirmCtx(null)}
+            context={confirmCtx}
+            onConfirm={handleConfirmDelete}
+            config={confirmConfig}
+          />
+        </div>
+      </DataTableEditingContext.Provider>
     </PortalContainerContext.Provider>
   )
 }
@@ -1285,7 +1356,8 @@ function DataTableRow<TData>({
                 "px-2 py-1 align-middle text-sm",
                 isPinned &&
                   "bg-card group-hover/row:bg-[color-mix(in_oklab,var(--card),var(--muted)_40%)] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--card),var(--primary)_5%)]",
-                isPinned && isRowEditing &&
+                isPinned &&
+                  isRowEditing &&
                   "bg-[color-mix(in_oklab,var(--card),#f59e0b_5%)]",
                 meta?.cellClassName
               )}

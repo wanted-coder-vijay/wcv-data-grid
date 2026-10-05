@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-10-06
+
+- Redesigned the showcase, playground, and docs with a graphite dark/light visual system, persistent mode control, animated signal drawing, spring table tilt, and reduced-motion support.
+- Fixed moded themes being held in light mode by inline tokens; explicit `.light` and `.dark` table classes now take precedence over ancestors and system preference.
+- Added `themePresets.graphite` and refined table headers, badges, selection, and hover surfaces.
+- Replaced legacy README screenshots with current dark/light playground and interaction captures served from the live demo.
+
+## [0.4.0] - 2026-10-06
+
+- Add live showcase, interactive playground, shareable configurations, downloadable examples, and configuration docs.
+- Add initial sorting, selected-row callbacks, accessible table names, striped rows, sticky-header control, and viewport max height.
+- Fix pagination-disabled tables truncating rows and default accessor cells rendering blank.
+- Respect read-only column predicates in whole-row editing and guard editor commits.
+- Neutralize spreadsheet formula text in CSV and Excel exports, including header labels.
+- Reject unsafe theme declaration values and inherited token keys.
+- Update development dependency resolutions to address reported brace-expansion and esbuild advisories.
+
 ## [0.3.2] - 2026-05-19
 
 Clarifies the row Details panel density behavior and keeps destructive confirmations scoped to the grid they belong to.

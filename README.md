@@ -13,37 +13,37 @@ Built on [TanStack Table v8](https://tanstack.com/table) · [Radix UI](https://w
 
 </div>
 
+**[Live showcase](https://dynostack-react-grid.vercel.app)** · **[Interactive playground](https://dynostack-react-grid.vercel.app/playground)** · **[Setup and configuration docs](https://dynostack-react-grid.vercel.app/docs)**
+
+Try every feature on real sample data, customize themes and density, share a configuration link, and copy the matching React props. The demo includes spring-based interactions and works on mobile.
+
 ---
 
 A single `<DataTable />` component that gives you ag-grid–level functionality with a fraction of the API surface and a shadcn/ui aesthetic. Every behavior is opt-in via props — drop it in and it works; configure it and it scales.
 
 ## Showcase
 
-<p align="center">
-  <img src="public/table-images/Screenshot%202026-05-25%20233937.png" alt="React data grid with toolbar, sorting, filters, pagination, export, and add-row controls" width="100%" />
-</p>
+A graphite studio for your data. Switch between light and dark, configure every feature, and copy the React configuration in the [live playground](https://dynostack-react-grid.vercel.app/playground).
 
-| Selection + bulk actions | Column menu |
+| Graphite dark | Precision light |
 | --- | --- |
-| <img src="public/table-images/Screenshot%202026-05-25%20234013.png" alt="Rows selected with bulk delete and clear actions visible in the toolbar" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234035.png" alt="Column menu with ascending sort, descending sort, pin, unpin, and hide column actions" width="100%" /> |
+| ![Dark table playground](https://dynostack-react-grid.vercel.app/table-images/grid-dark.png) | ![Light table playground](https://dynostack-react-grid.vercel.app/table-images/grid-light.png) |
 
-| Filter builder | Column visibility |
+| Filter builder | Selection and export |
 | --- | --- |
-| <img src="public/table-images/Screenshot%202026-05-25%20234221.png" alt="Column filter builder with operator select, value input, add condition, clear, close, and apply controls" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234246.png" alt="Column visibility popover with checked columns and reset control" width="100%" /> |
+| ![Set filter with conditions](https://dynostack-react-grid.vercel.app/table-images/grid-filter.png) | ![Selected row with export menu](https://dynostack-react-grid.vercel.app/table-images/grid-selection.png) |
 
-| Export selected rows | Inline add and edit |
-| --- | --- |
-| <img src="public/table-images/Screenshot%202026-05-25%20234301.png" alt="Export menu for selected rows with CSV and Excel options" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234313.png" alt="Inline add-row editing with text fields, select input, date input, save, and cancel controls" width="100%" /> |
+```tsx
+import { DataTable, themePresets } from '@dynostack/react-grid'
 
-| Row actions | Details panel |
-| --- | --- |
-| <img src="public/table-images/Screenshot%202026-05-25%20234410.png" alt="Row actions menu with view, edit, duplicate, and delete commands" width="100%" /> | <img src="public/table-images/Screenshot%202026-05-25%20234428.png" alt="Right-side details panel with compact, relaxed, and comfy density controls" width="100%" /> |
-
-| Search |
-| --- |
-| <img src="public/table-images/Screenshot%202026-05-25%20234453.png" alt="Search input expanded in the table toolbar" width="100%" /> |
+// Add .dark to an ancestor for dark mode, or .light for light mode.
+<DataTable data={rows} columns={columns} theme={themePresets.graphite} />
+```
 
 ## Highlights
+
+- **Layout and state controls** — `initialSorting`, `onSelectionChange`, `ariaLabel`, `striped`, `stickyHeader`, and `maxHeight`. Disabling pagination renders all matching loaded rows.
+- **Safer exports and editing** — spreadsheet formulas in untrusted text are neutralized; row editing respects `meta.isEditable`; theme values cannot escape scoped CSS declarations.
 
 - **Filters that actually filter** — text, number, date with operators (`contains`, `not contains`, `equals`, `before`, `after`, `in range`, `blank`, `not blank`, …), AND/OR combine of two conditions, and a set filter with search + select-all
 - **Inline editing** — double-click cell to edit, or enter row-edit mode with `Save` / `Cancel`
@@ -54,7 +54,7 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 - **CSV / Excel export** — selection-aware (export selected vs. all)
 - **Built-in row Details panel** — `View` opens a scoped sheet with compact, relaxed, and comfy field layouts
 - **Scoped delete confirmation** — row and bulk delete confirmations stay inside the table instead of covering the entire app
-- **Theming that just works** — shadcn-compatible CSS variables, automatic OS dark-mode follow, cascade-layered defaults that never overwrite your app theme, full-repaint moded presets (`violet`, `emerald`, `amber`, `rose`, `sky`, `slate`, …), `buildPreset(hue)` for custom hues, and `isolate` to opt out of inheriting the app theme
+- **Theming that just works** — shadcn-compatible CSS variables, automatic OS dark-mode follow, cascade-layered defaults that never overwrite your app theme, full-repaint moded presets (`graphite`, `violet`, `emerald`, `amber`, `rose`, `sky`, `slate`, …), `buildPreset(hue)` for custom hues, and `isolate` to opt out of inheriting the app theme
 - **Density** — `compact` · `default` · `comfortable`
 - **i18n / labels** — every visible string is overridable
 - **Feature flags** — turn off any toolbar control or table capability with a single boolean
@@ -94,6 +94,34 @@ A single `<DataTable />` component that gives you ag-grid–level functionality 
 
 ## Install
 
+### Run the showcase locally
+
+```sh
+git clone https://github.com/wanted-coder-vijay/wcv-data-grid.git
+cd wcv-data-grid
+npm install
+npm run build
+npm install --prefix showcase
+npm run showcase:dev
+```
+
+### New layout controls
+
+```tsx
+<DataTable
+  data={rows}
+  columns={columns}
+  initialSorting={[{ id: "name", desc: false }]}
+  onSelectionChange={(selectedRows) => setSelectedRows(selectedRows)}
+  ariaLabel="Project workspace"
+  striped
+  stickyHeader
+  maxHeight="480px"
+/>
+```
+
+`onSelectionChange` returns selected **loaded** row objects; server-side exports and selection do not fetch unseen pages. Editing flags are UI controls: your server must also validate fields, values, and permissions. CSV/Excel exports neutralize formula prefixes in strings while preserving actual numeric values. Excel output remains an HTML-based `.xls`, not native XLSX. Theme tokens reject declaration delimiters, CSS comments, backslash escapes, and URL expressions.
+
 ```sh
 npm i @dynostack/react-grid
 # or
@@ -102,7 +130,7 @@ pnpm add @dynostack/react-grid
 yarn add @dynostack/react-grid
 ```
 
-**Peer deps:** `react >= 18`, `react-dom >= 18`. All other deps (`@tanstack/react-table`, `radix-ui`, `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`) are bundled.
+**Peer deps:** `react >= 18.2`, `react-dom >= 18.2`. All other runtime dependencies (`@tanstack/react-table`, `radix-ui`, `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`) are installed automatically and remain external to the package bundle.
 
 ## Tailwind setup
 
@@ -386,7 +414,7 @@ A moded theme repaints the whole table **and** auto-flips on dark mode (OS prefe
 />
 ```
 
-The grid emits a tiny scoped `<style>` block that targets only this instance — multiple grids on the same page can wear different moded themes without interfering.
+The grid emits a scoped `<style>` block for each instance, so grids can use different moded themes. Set `className="dark"` or `className="light"` on a table to force its mode independently of the page. Moded light tokens live in the scoped stylesheet so they cannot override the dark declarations.
 
 ### Use a preset
 
@@ -459,7 +487,7 @@ CSS variables are emitted on each table root, so this works:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ Inline style on the grid root  (per-instance `theme`)    │  ← highest
+│ Scoped grid tokens / flat inline theme overrides       │  ← highest
 ├──────────────────────────────────────────────────────────┤
 │ Consumer's :root rules         (shadcn, custom app CSS)  │
 ├──────────────────────────────────────────────────────────┤
@@ -877,6 +905,12 @@ operations and only renders the returned page.
 | `pageSizeOptions`         | `number[]`                                                 | shadcn defaults        | Page-size dropdown options.                            |
 | `initialColumnPinning`    | `ColumnPinningState`                                       | `{ left: [], right: [] }` | Initial pinned columns.                            |
 | `initialColumnVisibility` | `VisibilityState`                                          | `{}`                   | Initial hidden columns.                                |
+| `initialSorting`          | `SortingState`                                             | `[]`                   | Initial column sort order.                             |
+| `onSelectionChange`       | `(rows: TData[]) => void`                                  | —                      | Observe selected loaded rows.                          |
+| `ariaLabel`               | `string`                                                   | `"Data table"`         | Accessible name for the table.                         |
+| `striped`                 | `boolean`                                                  | `false`                | Alternate row backgrounds.                             |
+| `stickyHeader`            | `boolean`                                                  | `false`                | Keep headers visible in the scroll viewport.           |
+| `maxHeight`               | `CSSProperties["maxHeight"]`                               | —                      | Limit the vertical scroll viewport.                    |
 | `globalFilter`            | `string`                                                   | uncontrolled           | Controlled global filter value.                        |
 | `onGlobalFilterChange`    | `(value: string) => void`                                  | —                      | Controlled global filter setter.                       |
 | `className`               | `string`                                                   | —                      | Extra classes on the table root.                       |

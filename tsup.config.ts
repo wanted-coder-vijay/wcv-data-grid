@@ -1,5 +1,5 @@
 import { defineConfig } from "tsup"
-import { copyFile } from "node:fs/promises"
+import { copyFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
 export default defineConfig({
@@ -25,6 +25,7 @@ export default defineConfig({
     js: '"use client";',
   },
   async onSuccess() {
+    await writeFile(resolve("dist/tailwind-content.js"), 'import { fileURLToPath } from "node:url";\nexport const content = fileURLToPath(new URL("./**/*.{js,cjs}", import.meta.url));\nexport default content;\n')
     // Ship the default-tokens stylesheet and optional page.css.
     await copyFile(
       resolve("src/styles.css"),

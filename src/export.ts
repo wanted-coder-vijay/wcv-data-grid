@@ -1,15 +1,23 @@
 import type { Table } from "@tanstack/react-table"
 
+/** Neutralize spreadsheet formulas in untrusted text; preserve real numbers. */
+export function sanitizeSpreadsheetValue(value: unknown): string {
+  if (value == null) return ""
+  const text = String(value)
+  if (typeof value === "string" && (/^[\s\u0000-\u001f]*[=+\-@＝＋－＠]/u.test(text) || /^[\t\r\n]/.test(text))) return `'${text}`
+  return text
+}
+
 function escapeCsv(value: unknown): string {
   if (value === null || value === undefined) return ""
-  const s = String(value)
+  const s = sanitizeSpreadsheetValue(value)
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
   return s
 }
 
 function escapeHtml(value: unknown): string {
   if (value === null || value === undefined) return ""
-  return String(value)
+  return sanitizeSpreadsheetValue(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

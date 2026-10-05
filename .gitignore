@@ -4,6 +4,10 @@ dist
 *.log
 *.tsbuildinfo
 .DS_Store
+.vercel
+deployment-payload.json
+showcase/node_modules
+showcase/dist
 .env
 .env.*
 !.env.example

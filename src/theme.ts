@@ -77,7 +77,19 @@ const TOKEN_TO_VAR: Record<keyof DataTableTokens, string> = {
   fontFamily: "--font-family",
 }
 
-function isModed(theme: DataTableTheme | undefined): theme is DataTableModedTheme {
+// Values are declarations, never CSS rules or network requests. Apply the same
+// validation to inline light tokens and interpolated dark-theme declarations.
+function isSafeToken(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    !/[;{}<>@\\\u0000-\u001f]/.test(value) &&
+    !/\/\*|\*\/|url\s*\(|expression\s*\(/i.test(value)
+  )
+}
+
+function isModed(
+  theme: DataTableTheme | undefined
+): theme is DataTableModedTheme {
   if (!theme) return false
   return "light" in theme || "dark" in theme
 }
@@ -87,8 +99,10 @@ export function tokensToStyle(tokens?: DataTableTokens): CSSProperties {
   if (!tokens) return {}
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(tokens)) {
-    if (v == null) continue
-    const cssVar = TOKEN_TO_VAR[k as keyof DataTableTokens]
+    if (!isSafeToken(v)) continue
+    const cssVar = Object.prototype.hasOwnProperty.call(TOKEN_TO_VAR, k)
+      ? TOKEN_TO_VAR[k as keyof DataTableTokens]
+      : undefined
     if (cssVar) out[cssVar] = v
   }
   return out as CSSProperties
@@ -158,7 +172,7 @@ export function buildPreset(hue: number, chroma = 0.03): DataTableModedTheme {
       border: `oklch(0.9 ${c * 0.8} ${hue})`,
       input: `oklch(0.9 ${c * 0.8} ${hue})`,
       ring: `oklch(0.55 0.2 ${hue} / 0.5)`,
-      radius: "0.625rem",
+      radius: "0.375rem",
     },
     dark: {
       background: `oklch(0.16 ${c * 0.6} ${hue})`,
@@ -180,7 +194,7 @@ export function buildPreset(hue: number, chroma = 0.03): DataTableModedTheme {
       border: `oklch(0.27 ${c * 0.8} ${hue})`,
       input: `oklch(0.27 ${c * 0.8} ${hue})`,
       ring: `oklch(0.7 0.18 ${hue} / 0.5)`,
-      radius: "0.625rem",
+      radius: "0.375rem",
     },
   }
 }
@@ -203,8 +217,10 @@ export function tokensToCssBlock(tokens?: DataTableTokens): string {
   if (!tokens) return ""
   const parts: string[] = []
   for (const [k, v] of Object.entries(tokens)) {
-    if (v == null) continue
-    const cssVar = TOKEN_TO_VAR[k as keyof DataTableTokens]
+    if (!isSafeToken(v)) continue
+    const cssVar = Object.prototype.hasOwnProperty.call(TOKEN_TO_VAR, k)
+      ? TOKEN_TO_VAR[k as keyof DataTableTokens]
+      : undefined
     if (cssVar) parts.push(`${cssVar}:${v}`)
   }
   return parts.join(";")
@@ -232,7 +248,7 @@ const neutral: DataTableModedTheme = {
     border: "oklch(0.922 0 0)",
     input: "oklch(0.922 0 0)",
     ring: "oklch(0.708 0 0)",
-    radius: "0.625rem",
+    radius: "0.375rem",
   },
   dark: {
     background: "oklch(0.145 0 0)",
@@ -254,7 +270,7 @@ const neutral: DataTableModedTheme = {
     border: "oklch(0.269 0 0)",
     input: "oklch(0.269 0 0)",
     ring: "oklch(0.439 0 0)",
-    radius: "0.625rem",
+    radius: "0.375rem",
   },
 }
 
@@ -274,6 +290,33 @@ const neutral: DataTableModedTheme = {
  */
 export const themePresets = {
   neutral,
+  graphite: {
+    light: {
+      ...neutral.light,
+      background: "#fafafa",
+      card: "#ffffff",
+      border: "#e5e5e5",
+      radius: "0.375rem",
+      fontFamily: "'Geist', sans-serif",
+    },
+    dark: {
+      ...neutral.dark,
+      background: "#101112",
+      card: "#101112",
+      popover: "#17191b",
+      border: "#292c2f",
+      input: "#303438",
+      muted: "#1b1e21",
+      mutedForeground: "#9ba2aa",
+      accent: "#24282d",
+      primary: "#edf0f3",
+      primaryForeground: "#101112",
+      ring: "#84b8ff",
+      destructive: "#fb7185",
+      radius: "0.375rem",
+      fontFamily: "'Geist', sans-serif",
+    },
+  } satisfies DataTableModedTheme,
   light: { light: neutral.light } satisfies DataTableModedTheme,
   dark: { light: neutral.dark } satisfies DataTableModedTheme,
   violet: buildPreset(285),
@@ -293,4 +336,3 @@ export type DataTableThemeName = keyof typeof themePresets
  */
 export const ISOLATE_LIGHT_TOKENS: DataTableTokens = neutral.light!
 export const ISOLATE_DARK_TOKENS: DataTableTokens = neutral.dark!
-

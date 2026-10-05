@@ -81,11 +81,65 @@
   --radius-2xl: calc(var(--radius) * 1.8);
 }
 
+@custom-variant dark (&:where(.dark, .dark *):not(:where([data-dyno-grid].light, [data-dyno-grid].light *)));
+
+/* Tailwind v4 borders default to currentColor. Keep the default scoped to
+ * grid surfaces; utility and consumer border colors still take precedence. */
+@layer base {
+  [data-dyno-grid],
+  [data-dyno-grid] * {
+    border-color: var(--border);
+  }
+}
+
+/* Polished surfaces, scoped to the grid so host applications keep their UI. */
+@layer components {
+  [data-dyno-grid] {
+    box-shadow: none;
+    font-family: var(--font-family, inherit);
+    font-variant-numeric: tabular-nums;
+  }
+  [data-dyno-grid] thead {
+    background: color-mix(in srgb, var(--muted) 45%, var(--card));
+  }
+  [data-dyno-grid] th {
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+  [data-dyno-grid] tbody tr {
+    transition: background-color 150ms ease;
+  }
+  [data-dyno-grid] tbody tr[data-state="selected"] {
+    background: color-mix(in srgb, var(--primary) 9%, var(--card));
+  }
+  [data-dyno-grid] [data-slot="button"] {
+    box-shadow: none;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+  [data-dyno-grid] [data-slot="badge"] {
+    border-radius: 4px;
+    font-weight: 450;
+  }
+  [data-dyno-grid] input {
+    box-shadow: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-dyno-grid] *,
+    [data-dyno-grid] *::before,
+    [data-dyno-grid] *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
 @layer dynostack-grid-defaults {
   :root {
     color-scheme: light;
 
-    --radius: 0.625rem;
+    --radius: 0.375rem;
 
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
