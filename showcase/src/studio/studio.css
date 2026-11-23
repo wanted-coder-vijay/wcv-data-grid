@@ -1,0 +1,479 @@
+.ds-studio {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: calc(100vh - 80px);
+  background: var(--ds-bg);
+  border-top: 1px solid var(--ds-border);
+  color-scheme: inherit;
+}
+.ds-studio-nav {
+  background: var(--ds-surface);
+  border-right: 1px solid var(--ds-border);
+  padding: 26px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.ds-studio-back {
+  font-size: 12px;
+  color: var(--ds-muted);
+  padding-left: 10px;
+}
+.ds-studio-brand {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  padding: 0 9px;
+}
+.ds-studio-logo {
+  display: grid;
+  place-items: center;
+  background: #2865c4;
+  color: white;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 29px;
+  font-weight: 700;
+}
+.ds-studio-brand strong {
+  display: block;
+  font-size: 14px;
+  letter-spacing: -0.2px;
+}
+.ds-studio-brand small {
+  display: block;
+  color: var(--ds-muted);
+  font-size: 10px;
+  margin-top: 3px;
+}
+.ds-studio-nav nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ds-studio .ds-studio-nav nav button {
+  justify-content: flex-start;
+  border: 0;
+  padding: 12px;
+  background: transparent;
+  font-size: 13px;
+  gap: 11px;
+  min-height: 43px;
+}
+.ds-studio .ds-studio-nav nav button[aria-current='page'] {
+  background: var(--ds-accent-soft);
+  color: var(--ds-accent);
+  font-weight: 600;
+}
+.ds-studio-nav nav button i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ds-accent);
+  margin-left: auto;
+}
+.ds-studio-note {
+  margin-top: auto;
+  border-top: 1px solid var(--ds-border);
+  padding: 20px 10px 0;
+}
+.ds-studio-note strong {
+  font-size: 12px;
+}
+.ds-studio-note p {
+  font-size: 12px;
+  color: var(--ds-muted);
+  margin: 8px 0 12px;
+}
+.ds-studio-note span {
+  font-size: 10px;
+  color: var(--ds-muted);
+}
+.ds-studio-grid-link {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--ds-accent);
+  padding: 0 10px;
+}
+.ds-studio-main {
+  padding: 0 30px;
+  min-width: 0;
+}
+.ds-studio-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--ds-border);
+  color: var(--ds-muted);
+  font-size: 11px;
+}
+.ds-studio-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 32px 0 20px;
+}
+.ds-studio-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ds-studio-title svg {
+  color: var(--ds-accent);
+  stroke-width: 1.5;
+}
+.ds-studio h1 {
+  font-size: 32px;
+  letter-spacing: -0.9px;
+  font-family: inherit;
+}
+.ds-studio-intro p {
+  color: var(--ds-muted);
+  font-size: 14px;
+  margin: 10px 0 0;
+  max-width: 620px;
+}
+.ds-studio-intro > button {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.ds-studio-capabilities {
+  display: flex;
+  gap: 23px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 22px 0 30px;
+}
+.ds-studio-capabilities span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ds-muted);
+}
+.ds-studio-capabilities svg {
+  color: #289782;
+}
+.ds-studio-tabbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--ds-border);
+}
+.ds-studio-tabbar > div {
+  display: flex;
+  gap: 8px;
+}
+.ds-studio .ds-studio-tabbar button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 4px;
+  margin-right: 17px;
+  border-bottom: 2px solid transparent;
+  color: var(--ds-muted);
+  font-size: 12px;
+}
+.ds-studio .ds-studio-tabbar button[aria-pressed='true'] {
+  border-bottom-color: var(--ds-accent);
+  color: var(--ds-accent);
+}
+.ds-studio-tabbar label {
+  font-size: 11px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--ds-muted);
+}
+.ds-studio-tabbar input {
+  accent-color: var(--ds-accent);
+}
+.ds-studio-workspace {
+  min-width: 0;
+}
+.ds-studio-footnote {
+  padding: 20px 0 35px;
+  font-size: 11px;
+  color: var(--ds-muted);
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+.ds-studio-footnote > span {
+  max-width: 1000px;
+}
+.ds-studio-footnote a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.ds-studio-message {
+  padding: 10px 15px;
+  border-radius: 6px;
+  background: #e1f2e8;
+  color: #226647;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.ds-studio-docs {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  padding: 30px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+.ds-studio-docs h2 {
+  font-size: 23px;
+  letter-spacing: -0.4px;
+}
+.ds-studio-docs h3 {
+  margin-top: 28px;
+  font-size: 15px;
+}
+.ds-studio-docs p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ds-muted);
+  margin: 10px 0 18px;
+}
+.ds-studio-install {
+  padding: 14px;
+  background: var(--ds-soft);
+  border: 1px solid var(--ds-border);
+  border-radius: 6px;
+}
+.ds-studio-install code {
+  font-size: 11px;
+}
+.ds-studio-install span {
+  display: block;
+  font-size: 11px;
+  color: var(--ds-muted);
+  margin-top: 12px;
+}
+.ds-studio-example {
+  align-self: start;
+  background: #1c2c41;
+  color: #dbe7f7;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ds-studio-example > div {
+  padding: 12px 16px;
+  border-bottom: 1px solid #ffffff20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.ds-studio .ds-studio-example button {
+  min-height: 27px;
+  font-size: 11px;
+  background: #ffffff10;
+  border-color: #ffffff20;
+  color: #dbe7f7;
+}
+.ds-studio-example pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 24px;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.ds-studio-responses {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: var(--ds-surface);
+}
+.ds-studio-responses pre {
+  overflow: auto;
+  font-size: 12px;
+}
+@media (min-width: 1700px) {
+  .ds-studio-main {
+    max-width: 1650px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 45px;
+  }
+}
+@media (max-width: 1100px) {
+  .ds-studio {
+    grid-template-columns: 185px minmax(0, 1fr);
+  }
+  .ds-studio-main {
+    padding: 0 18px;
+  }
+  .ds-studio-nav {
+    padding: 22px 9px;
+  }
+  .ds-studio-brand {
+    gap: 8px;
+    padding: 0 4px;
+  }
+  .ds-studio-brand strong {
+    font-size: 12px;
+  }
+  .ds-studio-nav nav button {
+    font-size: 12px !important;
+    padding: 10px !important;
+    gap: 7px !important;
+  }
+  .ds-studio-capabilities {
+    gap: 13px;
+  }
+  .ds-studio-docs {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .ds-studio {
+    display: block;
+  }
+  .ds-studio-nav {
+    display: block;
+    padding: 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ds-border);
+  }
+  .ds-studio-brand {
+    margin: 12px 0;
+  }
+  .ds-studio-nav nav {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .ds-studio-nav nav button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .ds-studio-nav nav button i {
+    display: none;
+  }
+  .ds-studio-note,
+  .ds-studio-grid-link {
+    display: none;
+  }
+  .ds-studio-main {
+    padding: 0 12px;
+  }
+  .ds-studio-topline {
+    padding: 12px 0;
+  }
+  .ds-studio-topline > span:last-child {
+    display: none;
+  }
+  .ds-studio-intro {
+    margin: 22px 0 14px;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .ds-studio h1 {
+    font-size: 28px;
+  }
+  .ds-studio-title {
+    gap: 10px;
+  }
+  .ds-studio-intro p {
+    font-size: 13px;
+  }
+  .ds-studio-capabilities {
+    margin: 18px 0;
+    gap: 12px;
+  }
+  .ds-studio-capabilities span {
+    font-size: 11px;
+  }
+  .ds-studio-tabbar {
+    padding-bottom: 12px;
+  }
+  .ds-studio-docs {
+    padding: 20px;
+    gap: 25px;
+  }
+  .ds-studio-example pre {
+    font-size: 11px;
+    padding: 15px;
+  }
+  .ds-studio-install code {
+    overflow-wrap: anywhere;
+  }
+}
+
+.ds-studio,
+.ds-studio .ds-tool,
+.ds-blocks,
+.ds-blocks .ds-tool {
+  --ds-bg: var(--canvas);
+  --ds-surface: var(--surface);
+  --ds-soft: var(--surface-raised);
+  --ds-text: var(--ink);
+  --ds-muted: var(--subtle);
+  --ds-border: var(--line);
+  --ds-accent: var(--blue);
+  --ds-accent-soft: var(--surface-raised);
+  --ds-edge: var(--subtle);
+  color: var(--ink);
+  font-family: 'Geist', system-ui, sans-serif;
+  color-scheme: inherit;
+}
+.ds-studio .ds-primary,
+.ds-blocks .ds-primary,
+.ds-studio-logo {
+  background: var(--button);
+  color: var(--button-ink);
+  border-color: var(--button);
+}
+.ds-studio .ds-primary:hover,
+.ds-blocks .ds-primary:hover {
+  background: var(--button);
+  opacity: 0.85;
+  color: var(--button-ink);
+}
+.ds-studio-example {
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.ds-studio .ds-studio-example button {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.ds-studio-example > div {
+  border-color: var(--line);
+}
+.ds-studio .ds-notice,
+.ds-studio-message,
+.ds-studio .ds-flow-node.is-traced {
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.ds-studio .ds-notice.ds-error {
+  background: color-mix(in srgb, #e34d59 12%, var(--surface));
+  color: #e34d59;
+}
+.ds-studio h1 {
+  font-weight: 550;
+}
+.ds-studio-title svg,
+.ds-studio-capabilities svg {
+  color: var(--subtle);
+}

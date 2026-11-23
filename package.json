@@ -1,7 +1,7 @@
 {
   "name": "@dynostack/react-grid",
-  "version": "0.5.1",
-  "description": "Enterprise-grade React DataGrid on TanStack + Radix + Tailwind, with operator-driven filters, inline editing, column pinning/resizing/reordering, CSV/Excel export, and full theme + i18n customization.",
+  "version": "0.6.0",
+  "description": "Dynostack React Grid: an open-source React data table built on TanStack Table, Radix UI and Tailwind CSS, with advanced filters, inline editing, column controls, CSV/Excel export, themes and i18n.",
   "license": "Apache-2.0",
   "author": "wanted-coder-vijay <drop.at.vijay@gmail.com>",
   "repository": {
@@ -30,13 +30,21 @@
     },
     "./styles.css": "./dist/styles.css",
     "./page.css": "./dist/page.css",
-    "./tailwind-content": "./dist/tailwind-content.js"
+    "./tailwind-content": "./dist/tailwind-content.js",
+    "./xlsx": {
+      "types": "./dist/xlsx.d.ts",
+      "import": "./dist/xlsx.js",
+      "require": "./dist/xlsx.cjs"
+    }
   },
   "files": [
     "dist",
     "README.md",
     "LICENSE",
-    "NOTICE"
+    "NOTICE",
+    "ADVANCED_GRID.md",
+    "API_REFERENCE.md",
+    "FEATURE_STATUS.md"
   ],
   "scripts": {
     "test": "node --test tests/*.test.mjs",
@@ -46,9 +54,23 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist",
-    "prepublishOnly": "npm run clean && npm run typecheck && npm run build"
+    "prepublishOnly": "npm run clean && npm run typecheck && npm run build && npm test",
+    "test:editing": "node tests/editing.browser.mjs",
+    "test:seo": "node --test tests/seo.check.mjs",
+    "test:state": "node tests/state.browser.mjs",
+    "test:advanced": "node tests/advanced.browser.mjs",
+    "docs:generate": "node scripts/generate-api-docs.mjs",
+    "test:performance": "node tests/performance.browser.mjs",
+    "studio:build": "npm --prefix studio run build",
+    "studio:typecheck": "npm --prefix studio run typecheck",
+    "studio:test": "npm --prefix studio test",
+    "studio:test:browser": "node tests/studio.browser.mjs"
   },
   "keywords": [
+    "dynostack",
+    "dynostack-grid",
+    "react-grid",
+    "data-grid",
     "react",
     "data-table",
     "tanstack-table",
@@ -62,10 +84,12 @@
   ],
   "peerDependencies": {
     "react": ">=18.2.0",
-    "react-dom": ">=18.2.0"
+    "react-dom": ">=18.2.0",
+    "exceljs": "^4.4.0"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
@@ -75,6 +99,7 @@
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "exceljs": "^4.4.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "rimraf": "^6.0.1",
@@ -82,6 +107,14 @@
     "typescript": "~5.9.3"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  },
+  "peerDependenciesMeta": {
+    "exceljs": {
+      "optional": true
+    }
   }
 }

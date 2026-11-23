@@ -9,4 +9,5 @@ export const products = [
     docs: "/docs",
     status: "available" as const,
   },
+  { id: "studio", name: "Studio", description: "Eight working React builders: forms, scheduling, dashboards, workflows, Gantt plans, documents, charts and application architecture. Install the independent Studio package.", href: "/studio", docs: "/studio", status: "available" as const },
 ]

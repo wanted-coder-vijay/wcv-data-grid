@@ -8,6 +8,7 @@ import {
   Trash2Icon,
   XIcon,
   CheckIcon,
+  Loader2Icon,
 } from "lucide-react"
 
 import { Button } from "./ui/button"
@@ -30,6 +31,9 @@ export type DataTableRowActionsProps<TData> = {
   customActions?: CustomRowAction<TData>[]
   onAction?: (action: RowActionId, row: TData) => void
   isEditing?: boolean
+  isSaving?: boolean
+  saveError?: string
+  savingLabel?: string
   onSaveEdit?: () => void
   onCancelEdit?: () => void
 }
@@ -54,6 +58,9 @@ export function DataTableRowActions<TData>({
   customActions = [],
   onAction,
   isEditing,
+  isSaving,
+  saveError,
+  savingLabel = "Saving…",
   onSaveEdit,
   onCancelEdit,
 }: DataTableRowActionsProps<TData>) {
@@ -106,24 +113,29 @@ export function DataTableRowActions<TData>({
 
   if (isEditing) {
     return (
-      <div className="flex items-center justify-end gap-1">
+      <div aria-busy={isSaving} className="flex flex-nowrap items-center justify-end gap-1" style={{ minWidth: 56 }}>
         <Button
           size="icon-xs"
           variant="ghost"
           onClick={onSaveEdit}
-          aria-label="Save row"
+          disabled={isSaving}
+          aria-label={isSaving ? savingLabel : "Save row"}
+          title={isSaving ? savingLabel : saveError || "Save row"}
           className="text-emerald-600 hover:text-emerald-600"
         >
-          <CheckIcon />
+          {isSaving ? <Loader2Icon className="animate-spin" /> : <CheckIcon />}
         </Button>
         <Button
           size="icon-xs"
           variant="ghost"
           onClick={onCancelEdit}
+          disabled={isSaving}
           aria-label="Cancel edit"
         >
           <XIcon />
         </Button>
+        {isSaving && <span role="status" className="sr-only">{savingLabel}</span>}
+
       </div>
     )
   }

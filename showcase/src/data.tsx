@@ -127,7 +127,7 @@ export function createColumns(editable = true): ColumnDef<Project>[] {
       accessorKey: "progress",
       header: "Progress",
       size: 132,
-      cell: ({ getValue }) => (
+      cell: ({ getValue }) => getValue() == null ? null : (
         <div className="progress-cell">
           <span>
             <i style={{ width: `${getValue<number>()}%` }} />

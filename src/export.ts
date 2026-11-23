@@ -33,8 +33,8 @@ function getExportRows<TData>(table: Table<TData>) {
     (c) => c.columnDef.meta?.label ?? (typeof c.columnDef.header === "string" ? c.columnDef.header : c.id)
   )
 
-  const selected = table.getSelectedRowModel().rows
-  const rows = selected.length > 0 ? selected : table.getFilteredRowModel().rows
+  const selected = table.getSelectedRowModel().flatRows.filter(row => !row.getIsGrouped())
+  const rows = selected.length > 0 ? selected : table.getFilteredRowModel().flatRows.filter(row => !row.getIsGrouped())
 
   const data = rows.map((row) =>
     visible.map((col) => {

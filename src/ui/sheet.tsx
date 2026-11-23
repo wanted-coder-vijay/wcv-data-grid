@@ -69,7 +69,7 @@ function SheetContent({
       >
         {children}
         <DialogPrimitive.Close
-          className="absolute top-4 right-4 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="absolute top-4 right-4 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-ring/40"
           aria-label="Close"
         >
           <XIcon className="size-4" />

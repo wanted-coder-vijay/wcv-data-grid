@@ -67,11 +67,11 @@ test("CSV and Excel export protect both headers and cells without dropping selec
     { id: "amount", columnDef: { header: "Amount" } },
     { id: "secret", columnDef: { meta: { exportable: false } } },
   ]
-  const row = { getValue: (key) => (key === "name" ? "=1+1" : -42) }
+  const row = { getIsGrouped: () => false, getValue: (key) => (key === "name" ? "=1+1" : -42) }
   const table = {
     getVisibleLeafColumns: () => columns,
-    getSelectedRowModel: () => ({ rows: [row] }),
-    getFilteredRowModel: () => ({ rows: [] }),
+    getSelectedRowModel: () => ({ rows: [row], flatRows: [row] }),
+    getFilteredRowModel: () => ({ rows: [], flatRows: [] }),
   }
   try {
     exportToCsv(table, "projects")

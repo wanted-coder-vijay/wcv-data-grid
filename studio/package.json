@@ -1,0 +1,110 @@
+{
+  "name": "@dynostack/react-studio",
+  "version": "0.1.0",
+  "description": "Controlled React builders for forms, schedules, dashboards, workflows, project plans, documents and charts.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "FEATURES.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./forms": {
+      "types": "./dist/forms.d.ts",
+      "import": "./dist/forms.js",
+      "require": "./dist/forms.cjs"
+    },
+    "./scheduler": {
+      "types": "./dist/scheduler.d.ts",
+      "import": "./dist/scheduler.js",
+      "require": "./dist/scheduler.cjs"
+    },
+    "./dashboard": {
+      "types": "./dist/dashboard.d.ts",
+      "import": "./dist/dashboard.js",
+      "require": "./dist/dashboard.cjs"
+    },
+    "./workflow": {
+      "types": "./dist/workflow.d.ts",
+      "import": "./dist/workflow.js",
+      "require": "./dist/workflow.cjs"
+    },
+    "./gantt": {
+      "types": "./dist/gantt.d.ts",
+      "import": "./dist/gantt.js",
+      "require": "./dist/gantt.cjs"
+    },
+    "./document": {
+      "types": "./dist/document.d.ts",
+      "import": "./dist/document.js",
+      "require": "./dist/document.cjs"
+    },
+    "./charts": {
+      "types": "./dist/charts.d.ts",
+      "import": "./dist/charts.js",
+      "require": "./dist/charts.cjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./application": {
+      "types": "./dist/application.d.ts",
+      "import": "./dist/application.js",
+      "require": "./dist/application.cjs"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsup --config tsup.config.ts",
+    "test": "node --test tests/*.test.mjs",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-dom": ">=18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "~5.9.3",
+    "tsup": "^8.3.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wanted-coder-vijay/wcv-data-grid.git",
+    "directory": "studio"
+  },
+  "homepage": "https://dynostack-react-grid.vercel.app/studio",
+  "author": "wanted-coder-vijay <drop.at.vijay@gmail.com>",
+  "keywords": [
+    "dynostack",
+    "react",
+    "builders",
+    "workflow",
+    "forms",
+    "charts",
+    "architecture",
+    "gantt"
+  ]
+}

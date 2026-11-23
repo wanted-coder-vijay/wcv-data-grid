@@ -36,7 +36,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm whitespace-nowrap shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-8 data-[size=sm]:h-7 data-[placeholder]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0",
+        "flex w-fit items-center justify-between gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm whitespace-nowrap shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-0 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-8 data-[size=sm]:h-7 data-[placeholder]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0",
         className
       )}
       {...props}

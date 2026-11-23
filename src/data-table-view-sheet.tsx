@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { Column, Table } from "@tanstack/react-table"
-import { LayoutGridIcon, ListIcon, Rows3Icon } from "lucide-react"
+import { LayoutGridIcon, ListIcon, Rows3Icon, PencilIcon, Trash2Icon } from "lucide-react"
 
 import { Button } from "./ui/button"
 import {
@@ -20,6 +20,9 @@ export type ViewSheetDensity = "compact" | "relaxed" | "comfy"
 export type ViewSheetLabels = {
   title?: (row: any) => React.ReactNode
   description?: (row: any) => React.ReactNode
+  edit?: string
+  delete?: string
+  close?: string
   emptyValue?: string
   density?: {
     compact?: string
@@ -29,6 +32,9 @@ export type ViewSheetLabels = {
 }
 
 export type ViewSheetConfig<TData> = {
+  /** Show actions only when the corresponding table callback is available. */
+  actions?: { edit?: boolean; delete?: boolean }
+  width?: React.CSSProperties["width"]
   /** Side of the screen to slide in from. Defaults to "right". */
   side?: SheetSide
   /** Initial layout density. Defaults to "compact" (more fields per row). */
@@ -50,7 +56,7 @@ export type ViewSheetConfig<TData> = {
 }
 
 const COLS_CLASS: Record<ViewSheetDensity, string> = {
-  compact: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  compact: "grid-cols-1 sm:grid-cols-2",
   relaxed: "grid-cols-1 sm:grid-cols-2",
   comfy: "grid-cols-1",
 }
@@ -72,17 +78,21 @@ export function DataTableViewSheet<TData>({
   row,
   open,
   onOpenChange,
-  config,
+  config, onEdit, onDelete,
 }: {
   table: Table<TData>
   row: TData | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onEdit?: (row: TData) => void
+  onDelete?: (row: TData) => void
   config?: ViewSheetConfig<TData>
 }) {
   const [density, setDensity] = useState<ViewSheetDensity>(
     config?.defaultDensity ?? "compact"
   )
+
+  useEffect(() => { setDensity(config?.defaultDensity ?? "compact") }, [config?.defaultDensity])
 
   const fields = useMemo(() => {
     if (!row) return []
@@ -102,7 +112,7 @@ export function DataTableViewSheet<TData>({
         .filter((c): c is Column<TData, unknown> => Boolean(c))
     }
     return allCols
-  }, [table, row, config?.fields])
+  }, [table, row, config?.fields, table.getState().columnVisibility, table.getState().columnOrder])
 
   if (!row) return null
 
@@ -116,25 +126,27 @@ export function DataTableViewSheet<TData>({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side={config?.side ?? "right"}>
+      <SheetContent side={config?.side ?? "right"} className="gap-0 p-0" style={{ width: config?.side === "top" || config?.side === "bottom" ? undefined : config?.width ?? "min(36rem, 100vw)" }}>
+        <div className="border-b bg-muted/20 px-6 py-6">
+        <p className="mb-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Record details</p>
         {config?.renderHeader ? (
-          config.renderHeader(row)
+          <><SheetTitle className="sr-only">{labels?.title ? labels.title(row) : "Record details"}</SheetTitle>{config.renderHeader(row)}</>
         ) : (
           <SheetHeader>
             <SheetTitle>
               {labels?.title ? labels.title(row) : "Details"}
             </SheetTitle>
-            {labels?.description && (
-              <SheetDescription>{labels.description(row)}</SheetDescription>
-            )}
+            <SheetDescription>{labels?.description ? labels.description(row) : "Review this record, then edit its fields or manage it using the actions below."}</SheetDescription>
           </SheetHeader>
         )}
 
+        </div>
+        <div data-grid-scrollbar="" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         {!config?.hideDensityTabs && (
           <div
             role="tablist"
             aria-label="Layout density"
-            className="inline-flex w-fit gap-0.5 rounded-md border bg-muted/40 p-0.5 text-xs"
+            className="mb-5 inline-flex w-fit gap-0.5 rounded-md border bg-muted/40 p-0.5 text-xs"
           >
             {(["compact", "relaxed", "comfy"] as const).map((d) => (
               <button
@@ -156,7 +168,7 @@ export function DataTableViewSheet<TData>({
           </div>
         )}
 
-        <div className={cn("grid gap-3 overflow-y-auto", COLS_CLASS[density])}>
+        <div className={cn("grid gap-3", COLS_CLASS[density])}>
           {fields.map((col) => {
             const colId = col.id
             const colDef = col.columnDef
@@ -164,7 +176,7 @@ export function DataTableViewSheet<TData>({
               (colDef.meta as { label?: string } | undefined)?.label ??
               (typeof colDef.header === "string" ? colDef.header : colId)
             // @ts-expect-error - accessor key is column-specific
-            const rawValue = (row as any)[colDef.accessorKey ?? colId]
+            const rawValue = col.accessorFn ? col.accessorFn(row, 0) : (row as any)[colDef.accessorKey ?? colId]
             const rendered = config?.renderField
               ? config.renderField({ column: col, value: rawValue, row })
               : defaultRenderValue(rawValue, emptyValue)
@@ -172,14 +184,14 @@ export function DataTableViewSheet<TData>({
               <div
                 key={colId}
                 className={cn(
-                  "flex min-w-0 flex-col rounded-md border bg-card",
+                  "flex min-w-0 flex-col rounded-lg border bg-muted/10",
                   CARD_CLASS[density]
                 )}
               >
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   {headerLabel}
                 </span>
-                <span className="break-words text-sm text-foreground">
+                <span className="break-words text-sm font-medium text-foreground">
                   {rendered}
                 </span>
               </div>
@@ -187,10 +199,11 @@ export function DataTableViewSheet<TData>({
           })}
         </div>
 
-        <div className="mt-2 flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+        </div>
+        <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t bg-muted/20 px-6 py-4">
+          {onDelete && config?.actions?.delete !== false && <Button variant="destructive" size="sm" onClick={() => onDelete(row)}><Trash2Icon />{labels?.delete ?? "Delete record"}</Button>}
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{labels?.close ?? "Close details"}</Button>
+          {onEdit && config?.actions?.edit !== false && <Button size="sm" onClick={() => onEdit(row)}><PencilIcon />{labels?.edit ?? "Edit record"}</Button>}
         </div>
       </SheetContent>
     </Sheet>

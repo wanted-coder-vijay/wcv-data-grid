@@ -3,7 +3,7 @@ import { copyFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: ["src/index.ts", "src/xlsx.ts"],
   format: ["esm", "cjs"],
   dts: true,
   sourcemap: true,
@@ -11,6 +11,8 @@ export default defineConfig({
   treeshake: true,
   splitting: false,
   external: [
+    "exceljs",
+    "@tanstack/react-virtual",
     "react",
     "react-dom",
     "react/jsx-runtime",

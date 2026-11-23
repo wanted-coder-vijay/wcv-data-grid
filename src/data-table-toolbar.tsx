@@ -57,6 +57,7 @@ type ToolbarLabels = {
 }
 
 type Props<TData> = {
+  onExportXlsx?: (table: Table<TData>, fileName: string) => Promise<unknown>
   table: Table<TData>
   totalRecords: number
   isFetching?: boolean
@@ -87,6 +88,7 @@ const TOOLBAR_DEFAULT_LABELS: Required<ToolbarLabels> = {
 
 export function DataTableToolbar<TData>({
   table,
+  onExportXlsx,
   totalRecords,
   isFetching,
   onRefresh,
@@ -106,9 +108,11 @@ export function DataTableToolbar<TData>({
   const showSearch = features?.search ?? true
   const showColumnVisibility = features?.columnVisibility ?? true
   const showExport = features?.export ?? true
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState("")
   const [searchOpen, setSearchOpen] = useState(Boolean(globalFilter))
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const selectedRows = table.getSelectedRowModel().rows
+  const selectedRows = table.getSelectedRowModel().flatRows.filter(row => !row.getIsGrouped())
   const selectedCount = selectedRows.length
   const hideableColumns = table.getAllLeafColumns().filter((c) => c.getCanHide())
   const visibleCount = hideableColumns.filter((c) => c.getIsVisible()).length
@@ -124,6 +128,8 @@ export function DataTableToolbar<TData>({
   return (
     <div className="flex flex-wrap items-center gap-2 border-b p-2">
       {toolbarSlot}
+      {exporting && <span role="status">Preparing workbook…</span>}
+      {exportError && <span role="alert">{exportError}</span>}
 
       {selectedCount > 0 && (
         <>
@@ -284,9 +290,14 @@ export function DataTableToolbar<TData>({
                 <FileTextIcon /> {labels.csv}
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => exportToExcel(table, exportFileName)}
+                disabled={exporting}
+                onSelect={() => {
+                  if (!onExportXlsx) { exportToExcel(table, exportFileName); return }
+                  setExporting(true); setExportError("")
+                  Promise.resolve().then(() => onExportXlsx(table, exportFileName)).catch(() => setExportError("Workbook export failed. Try again.")).finally(() => setExporting(false))
+                }}
               >
-                <FileSpreadsheetIcon /> {labels.excel}
+                <FileSpreadsheetIcon /> {onExportXlsx ? "XLSX workbook" : labels.excel}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

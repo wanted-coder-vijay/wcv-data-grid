@@ -69,7 +69,8 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid var(--subtle);
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--subtle);
   outline-offset: 3px;
 }
 button:not([data-slot]) {
@@ -778,7 +779,8 @@ html {
   transform: translateX(12px);
 }
 .switch-row input:focus-visible + .switch-track {
-  outline: 3px solid var(--subtle);
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--subtle);
   outline-offset: 2px;
 }
 .preview-panel {
@@ -1978,3 +1980,28 @@ pre {
   color: var(--ink);
   font-weight: 600;
 }
+
+.playground-lab { padding: 16px; border-top: 1px solid var(--line); font-size: 13px; } .playground-lab p { margin: 0 0 12px; } .playground-lab pre { max-height: 280px; overflow: auto; font-size: 12px; }
+
+[data-cell-editor]:focus-visible { box-shadow: none; }
+
+/* Match configuration and table scrollbars, including their dimensions. */
+.config-panel, [data-grid-scrollbar] { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.config-panel::-webkit-scrollbar, [data-grid-scrollbar]::-webkit-scrollbar { width: 6px; height: 6px; }
+.config-panel::-webkit-scrollbar-track, [data-grid-scrollbar]::-webkit-scrollbar-track { background: transparent; }
+.config-panel::-webkit-scrollbar-thumb, [data-grid-scrollbar]::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+.config-panel::-webkit-scrollbar-button, [data-grid-scrollbar]::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+.api-guide { margin: 24px 0; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.api-guide h4 { font-size: 16px; margin: 0 0 8px; }
+.api-declaration { margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+.api-declaration summary { cursor: pointer; font-weight: 600; }
+.api-declaration summary span { display: block; margin: 6px 0; font-size: 11px; color: var(--muted); font-weight: normal; }
+.api-declaration pre { overflow: auto; max-height: 560px; padding: 14px; font-size: 12px; background: var(--surface); }
+.api-table-scroll { overflow-x: auto; }
+.api-declaration table { width: 100%; min-width: 650px; font-size: 12px; border-collapse: collapse; }
+.api-declaration th, .api-declaration td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 10px; }
+.api-declaration td code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.api-declaration td p { font-size: 12px; margin: 5px 0; }
+
+.api-guide code { overflow-wrap: anywhere; white-space: normal; }

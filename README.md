@@ -5,9 +5,9 @@
   <img src="https://dynostack-react-grid.vercel.app/brand/dynostack-grid-wordmark-light.svg" alt="Dynostack Grid" width="360">
 </picture>
 
-# @dynostack/react-grid
+# Dynostack React Grid — @dynostack/react-grid
 
-**Enterprise-grade React data grid. Drop-in.**
+**Dynostack React Grid: an open-source React data table with advanced filtering, inline editing, column controls, themes, and exports.**
 
 Built on [TanStack Table v8](https://tanstack.com/table) · [Radix UI](https://www.radix-ui.com/) · [Tailwind CSS](https://tailwindcss.com/) · ships shadcn/ui look-and-feel out of the box.
 
@@ -25,8 +25,6 @@ Try every feature on real sample data, customize themes and density, share a con
 ---
 
 A single `<DataTable />` component that gives you ag-grid–level functionality with a fraction of the API surface and a shadcn/ui aesthetic. Every behavior is opt-in via props — drop it in and it works; configure it and it scales.
-
-Dynostack is a growing family of tools. Grid is the first product, with a shared brand system designed for future modules. [Download the Dynostack and Grid logos](https://dynostack-react-grid.vercel.app/brand.html).
 
 ## Showcase
 
@@ -586,6 +584,7 @@ type ColumnMeta = {
   cellClassName?: string
   headerClassName?: string
   exportable?: boolean
+  validate?: (value: unknown, row) => string | undefined | Promise<string | undefined>
   isEditable?: boolean | ((row) => boolean)
   badgeMap?: Partial<
     Record<string,
@@ -602,14 +601,14 @@ The default `filterFn` for a column is wired automatically from `meta.filterType
 
 ## Editing
 
-Two modes, both prop-driven, both work simultaneously:
+Two modes, both prop-driven. One editing session is active at a time:
 
 ### Single cell — double-click
 
 ```tsx
 <DataTable
   onCellEdit={(row, columnId, value) =>
-    saveMutation.mutate({ ...row, [columnId]: value })
+    saveMutation.mutateAsync({ ...row, [columnId]: value })
   }
 />
 ```
@@ -619,10 +618,27 @@ Two modes, both prop-driven, both work simultaneously:
 ```tsx
 <DataTable
   onRowSave={(row, draft) =>
-    saveMutation.mutate({ ...row, ...draft })
+    saveMutation.mutateAsync({ ...row, ...draft })
   }
 />
 ```
+
+Save handlers accept `void | Promise<unknown>`. **Return the save promise** so the grid can wait for persistence. While saving or validating, editors and Save/Cancel are disabled. Rejected promises and thrown errors keep editing open and retain the draft for retry. Successful saves close editing; the application remains responsible for updating `data`.
+
+Add field validation to editable column metadata:
+
+```tsx
+{
+  accessorKey: "name",
+  meta: {
+    editor: "text",
+    validate: (value) =>
+      typeof value === "string" && value.trim() ? undefined : "Name is required.",
+  },
+}
+```
+
+Validators return an error string or `undefined`, synchronously or asynchronously. Row saves validate every editable editor column, including hidden columns, against the merged row draft. Cell saves validate the changed value with the original row. Invalid values never reach save callbacks. Field errors are announced and linked to editors; hidden-field errors also appear in the row summary. Customize `labels.saving`, `labels.saveError`, and `labels.validationError` for your language. Validate permissions and values again on the server.
 
 `isEditable` on `meta` can disable editing for individual rows or columns:
 
@@ -904,8 +920,8 @@ operations and only renders the returned page.
 | `rowActions`              | `("view" \| "edit" \| "duplicate" \| "delete")[]`          | all four               | Built-in row actions.                                  |
 | `customRowActions`        | `CustomRowAction<TData>[]`                                 | `[]`                   | Extra row actions.                                     |
 | `onRowAction`             | `(action, row) => void`                                    | —                      | Row action handler.                                    |
-| `onCellEdit`              | `(row, columnId, value) => void`                           | —                      | Single-cell save handler.                              |
-| `onRowSave`               | `(row, draft) => void`                                     | —                      | Row-edit save handler.                                 |
+| `onCellEdit`              | `(row, columnId, value) => void \| Promise<unknown>`                           | —                      | Single-cell save handler.                              |
+| `onRowSave`               | `(row, draft) => void \| Promise<unknown>`                                     | —                      | Row-edit save handler.                                 |
 | `onAddRow`                | `() => Partial<TData>`                                     | —                      | Returns the empty draft for "Add row".                 |
 | `onBulkDelete`            | `(rows: TData[]) => void`                                  | —                      | Bulk delete handler.                                   |
 | `initialPageSize`         | `number`                                                   | `10`                   | Initial pagination size.                               |
@@ -1094,3 +1110,166 @@ See [NOTICE](./NOTICE) for attribution requirements.
 > renamed to `@dynostack/react-grid` and relicensed under Apache-2.0.
 > The old name is deprecated; new code should depend on
 > `@dynostack/react-grid` only.
+
+### Editing browser regression check
+
+Run `npm run dev --prefix showcase -- --port 5181` and then `npm run test:editing` with Playwright available. The fixture lives at `/tests/editing.html`. Set `PLAYWRIGHT_MODULE` to an installed Playwright package path if it is outside this checkout; `BROWSER_CHANNEL` defaults to `msedge`, and `EDITING_BASE_URL` defaults to `http://127.0.0.1:5181`. The check covers validation, pending controls, failed persistence, retry, and cancellation. The fixture uses simulated persistence and is excluded from the production showcase entry point.
+
+
+## Controlled state and saved views (source build)
+
+These APIs are implemented in this repository and playground; npm 0.5.2 predates them.
+
+```tsx
+import { useState } from 'react'
+import { DataTable, createDataTableState } from '@dynostack/react-grid'
+// Inside your component:
+const [state, setState] = useState(() => createDataTableState({
+  pagination: { pageIndex: 0, pageSize: 20 },
+}))
+<DataTable data={rows} columns={columns}
+  state={state} onStateChange={setState}
+  savedViews={{ storageKey: 'project-views-v1' }} />
+```
+
+`state` supports sorting, columnFilters, globalFilter, pagination, rowSelection,
+columnOrder, columnSizing, columnVisibility, columnPinning and expanded.
+`onStateChange` receives the complete next snapshot, including internal slices.
+Pass a partial state to control only those slices; omitted slices remain internal.
+Supplied slices without a handler are read-only. `initialState` is applied once,
+overrides legacy initial props, and must contain complete values for supplied
+slices. `state.globalFilter` takes precedence over legacy `globalFilter`.
+Keep row/column IDs stable. Reset by setting a fresh `createDataTableState()`.
+
+`savedViews` adds Save view, Restore, Rename, Delete view, Reset view and Clear
+saved views. Snapshots contain search, filters, sorting, order, visibility, widths
+and pinning. They exclude rows, drafts, selection, expansion and pagination.
+Restore resets pageIndex to zero but retains pageSize and selection. Reset view
+restores the initial configuration. Controls lock while editing or saving.
+
+Persistence is optional: omit `storageKey` for session-only views. Use a unique,
+versioned key per dataset/schema. Clear saved views removes that localStorage
+key. Invalid, unavailable or full storage reports an error without blocking the
+table. Filter values must be JSON-compatible and may contain sensitive search
+terms. Maximum: 50 views, 80 characters per name. Persistence stores configuration,
+never records. For application-managed presets, pass `views` and
+`onViewsChange` and omit `storageKey`; `initialViews` seeds uncontrolled presets.
+Override control strings through `savedViews.labels`.
+
+### Playground walkthrough
+
+1. Enable **Required name & nonnegative budget**. Clear a project name and press
+   Enter: validation prevents persistence. Fix it and retry.
+2. Enable **Simulate 1.2-second saves** and **Fail saves**. Edit a cell or use
+   Edit in its row menu. Observe pending controls and retained draft after failure.
+   Disable Fail saves, then Enter or Save row to retry. Escape/Cancel discards.
+3. Enable **Application controlled state**. Change search, sort, selection,
+   column visibility/order/widths and page size; open Inspect table state.
+   Reset controlled state restores the table without replacing data.
+4. Enable **Named saved views**, optionally **Persist views in this browser**.
+   Configure the table, enter a name and Save view. Change the table and Restore.
+   Rename/Delete manage presets; Reset view resets layout; Clear saved views
+   removes presets and persisted storage. Playground Reset preserves saved views.
+
+The Code tab and shared playground URL include these options. Saves in the
+playground are simulated; production callbacks must return backend promises and
+update `data` only after successful persistence. See [FEATURE_STATUS.md](./FEATURE_STATUS.md)
+for all 18 roadmap items and current limitations.
+
+
+## Keyboard navigation, virtual rows and native workbooks (source build)
+
+```tsx
+<DataTable data={rows} columns={columns}
+  enableKeyboardNavigation virtualizeRows maxHeight="520px"
+  features={{ pagination: false }} />
+```
+
+Keyboard navigation is opt-in. Arrows move through visible cells; Home/End move
+to row edges; Tab/Shift+Tab move across rows and leave at the table boundary.
+Enter/F2 edits editable cells, Escape cancels and returns focus. Tab from a cell
+editor saves before moving; validation/failure retains the draft and focus.
+Themed select menus retain their own keyboard navigation. The date calendar
+supports arrows, Home/End and PageUp/PageDown; Escape closes the editor and
+restores cell focus. Whole-row editing uses normal Tab order and explicit
+Save/Cancel. Row and column positions are announced.
+Focus uses subtle borders/backgrounds rather than heavy outlines.
+
+Virtual rows use TanStack Virtual with measured heights, overscan and a bounded
+viewport (480px default). Disable pagination to virtualize all loaded records;
+server mode still requires the application to load records. Editing rows remain
+mounted outside the visible window. Expanded details span separate table rows,
+so detail panels are independently measured virtual items. Utility columns
+stay at the front: checkbox, expansion, then data. Save/cancel icons remain
+horizontal; save shows a spinner and locks controls, with success/failure toasts.
+
+For native workbooks, install the optional `exceljs` peer dependency:
+
+```tsx
+// npm install exceljs
+<DataTable data={rows} columns={columns}
+  onExportXlsx={async (table, fileName) => {
+    const { exportToXlsx } = await import('@dynostack/react-grid/xlsx')
+    await exportToXlsx(table, fileName, {
+      sheetName: 'Projects', formats: { budget: '$#,##0.00' },
+      additionalSheets: [{ name: 'Info', headers: ['Scope'], rows: [['Loaded records']] }],
+    })
+  }} />
+```
+
+`/xlsx` is a separate entry point; the core grid never imports ExcelJS.
+`createXlsxWorkbook(sheets)` returns Uint8Array bytes for custom download/storage.
+Each sheet accepts `name`, `headers`, `rows` and optional zero-based `formats`.
+Numbers, booleans and Date objects retain native types. ISO dates stay text.
+Strings, including formula-looking text, stay literal. Headers are bold/frozen.
+Export respects visible exportable columns and selected loaded rows; otherwise it
+exports filtered loaded rows, including virtual rows outside the viewport.
+The toolbar announces workbook preparation and reports failures for retry.
+Legacy `exportToExcel` retains its HTML .xls behavior for compatibility.
+
+ExcelJS is a substantial dependency and is lazy-loaded in the playground. This
+repository overrides ExcelJS's uuid dependency to ^11.1.1 after verifying its
+only call is v4. Consumers should audit their optional dependency tree and use
+an appropriate override where needed, e.g. `"overrides": { "exceljs": { "uuid": "^11.1.1" } }`.
+
+Playground: enable Keyboard cell navigation; enable Virtualize loaded rows and
+choose 10,000 or 50,000 sample rows (pagination switches off); enable Native XLSX export,
+then toggle numeric formatting and the extra information sheet. Export → XLSX
+workbook exercises the real adapter. Code/shared configuration includes all
+options. The French toolbar demo toggle has been removed; library label overrides
+remain available. These APIs are newer than npm 0.5.2.
+
+### Blank new rows and record details
+
+`onAddRow` returns a draft with a unique `id` (omit editable values to keep fields blank). Save validates and awaits `onRowSave`; insert the saved record into your application data in that callback. Cancel discards the draft; a failed save retains it for retry. Adding clears search, filters and sorting and opens the first page to make the draft visible.
+
+```tsx
+<DataTable data={rows} columns={columns}
+  onAddRow={() => ({ id: crypto.randomUUID() })}
+  onRowSave={saveAndUpdateRows} onDelete={deleteRow}
+  viewSheet={{ actions: { edit: true, delete: false },
+    width: "min(36rem, 100vw)", defaultDensity: "compact",
+    labels: { title: row => row.name, edit: "Edit project" } }} />
+```
+
+Details actions require the corresponding `onRowSave` / `onDelete` callback. Edit returns to inline row editing; Delete uses the table confirmation flow. Set `actions.edit` or `actions.delete` to `false` to hide them. Customize `side`, `fields`, `renderField`, `hideDensityTabs` and `labels` as needed. Table and details scrollbars use the same slim style in both directions.
+
+A **named saved view** saves a table setup, such as “Overdue projects”: its search, filters, sorting and column layout. Restore reapplies that setup to the current records; it does not store a copy of the records.
+
+### Large datasets and themed editors
+
+`virtualizeRows` now keeps detail panels virtualized and isolates scrolling to the row window. Use `features={{ pagination: false }}` and a bounded `maxHeight` to scroll all loaded rows. `virtualOverscan?: number` defaults to 8 (clamped to 1–100); `virtualRowHeight?: number` sets a minimum height and initial estimate while taller content is measured. Active edit rows remain mounted. Flat datasets of at least 2,000 records build their TanStack row model in tasks capped at 256 new row objects and about 6 ms, reusing unchanged record identities; progress is announced and obsolete work is canceled when data changes. Very large nested `getSubRows` models still use synchronous TanStack preparation. Sorting, filtering, select-all and exports operate on all loaded records; use server mode for expensive queries.
+
+Select editors use the themed Radix popup in row and cell editing. Date editors use a themed calendar with month/year selection, Today/Clear, arrows, Home/End and PageUp/PageDown. Date values remain date-only `YYYY-MM-DD` strings. Choose an option/date to update a row draft; persist the draft through `onRowSave`.
+
+The complete source API and callback types are in [API_REFERENCE.md](./API_REFERENCE.md) and the [searchable website reference](https://dynostack-react-grid.vercel.app/docs#doc-16). `npm run docs:generate` regenerates declarations directly from source; showcase builds do this automatically.
+
+### Dynostack Studio (local first release)
+
+The separate [React Studio package](./studio/README.md) contains working form, scheduler, dashboard, workflow, Gantt, document and chart modules. It does not change the grid's public API or dependencies. Run the existing showcase and open `/studio` for interactive playgrounds, JSON export, integration examples and save-failure simulation.
+
+Run `npm run studio:build`, `npm run studio:test`, and `npm run studio:test:browser` (default browser URL: `http://127.0.0.1:5192`). Use `STUDIO_BASE_URL` for another local port. [First-release scope](./studio/FEATURES.md) distinguishes supported behavior from advanced capabilities still to implement. Studio is not published or deployed by these commands.
+
+## Advanced grid operations and Studio
+
+Grouping and aggregation, custom React editors, atomic batch editing and undo/redo, query selection, nested filters, formatting rules, summaries and live update helpers are documented in [ADVANCED_GRID.md](./ADVANCED_GRID.md). The showcase includes an editable API adapter lab at `/api-playground`. Non-grid builders ship separately as [`@dynostack/react-studio`](https://www.npmjs.com/package/@dynostack/react-studio).

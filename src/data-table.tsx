@@ -1,6 +1,9 @@
+import { RowGrip } from "./row-grip"
 import {
+  memo,
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -22,7 +25,7 @@ import {
   type Table as TanstackTable,
   type VisibilityState,
   flexRender,
-  getCoreRowModel,
+  getGroupedRowModel,
   getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -30,6 +33,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import {
+  XIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   GripVerticalIcon,
@@ -48,7 +52,7 @@ import {
   type CustomRowAction,
   type RowActionId,
 } from "./data-table-row-actions"
-import { EditableCell } from "./editable-cell"
+import { EditableCell, EditableCellDisplay } from "./editable-cell"
 import {
   booleanFilterFn,
   dateFilterFn,
@@ -75,12 +79,19 @@ import {
   type ConfirmDeleteConfig,
   type ConfirmDeleteContext,
 } from "./data-table-confirm-delete"
+import { useVirtualizer, defaultRangeExtractor } from "@tanstack/react-virtual"
+import { useProgressiveRowModel } from "./progressive-row-model"
+import { useGridNavigation } from "./grid-navigation"
 import "./types"
+import { useDataTableState, type DataTableState } from "./table-state"
+import { SavedViewsControl, type DataTableSavedViewsConfig } from "./saved-views"
+import { matchesGridFilter, summarizeGridValues, type GridFilter, type GridSummaryOperation } from "./grid-operations"
 
 // ----- public configuration types --------------------------------------
 
 export type DataTableFeatures = {
   /** Toolbar global search input (default: true). */
+  grouping?: boolean
   search?: boolean
   /** Toolbar refresh button (default: true when onRefresh is provided). */
   refresh?: boolean
@@ -120,6 +131,9 @@ export type DataTableLabels = {
   noResults?: string
   loadError?: string
   retry?: string
+  saving?: string
+  saveError?: string
+  validationError?: string
   refreshing?: string
   rowsPerPage?: string
   page?: string
@@ -129,6 +143,9 @@ export type DataTableLabels = {
 export type DataTableDensity = "compact" | "default" | "comfortable"
 
 export type DataTableFetchParams = {
+  grouping?: string[]
+  filterExpression?: GridFilter
+  signal?: AbortSignal
   pageIndex: number
   pageSize: number
   sorting: SortingState
@@ -204,6 +221,10 @@ function getPinningStyles<TData>(
 // a context and let the host components read from it.
 
 type EditingContextValue<TData> = {
+  formattingRules?: { filter: GridFilter; columnId?: string; style: React.CSSProperties }[]
+  isNewRow: (id: string) => boolean
+  finishNewRow: (id: string) => void
+  announce: (message: string, kind: "success" | "error") => void
   editingCell: { rowId: string; colId: string } | null
   editingRowId: string | null
   rowDraft: Record<string, Partial<TData>>
@@ -212,11 +233,17 @@ type EditingContextValue<TData> = {
   setRowDraft: React.Dispatch<
     React.SetStateAction<Record<string, Partial<TData>>>
   >
+  saving: boolean
+  savingRef: React.MutableRefObject<boolean>
+  setSaving: (value: boolean) => void
+  fieldErrors: Record<string, string>
+  setFieldErrors: (errors: Record<string, string>) => void
+  labels: Required<DataTableLabels>
   rowActions: ("view" | "edit" | "duplicate" | "delete")[]
   customRowActions?: CustomRowAction<TData>[]
   onRowAction?: (action: RowActionId, row: TData) => void
-  onCellEdit?: (row: TData, columnId: string, value: unknown) => void
-  onRowSave?: (row: TData, draft: Partial<TData>) => void
+  onCellEdit?: (row: TData, columnId: string, value: unknown) => void | Promise<unknown>
+  onRowSave?: (row: TData, draft: Partial<TData>) => void | Promise<unknown>
   onView?: (row: TData) => void
   onRequestDelete?: (row: TData) => void
 }
@@ -232,94 +259,162 @@ function useEditingContext<TData>(): EditingContextValue<TData> {
 
 function DefaultCellHost<TData, TValue>(ctx: CellContext<TData, TValue>) {
   const value = ctx.getValue()
-  return value == null ? null : String(value)
+  return ctx.column.columnDef.meta?.formatValue ? ctx.column.columnDef.meta.formatValue(value, ctx.row.original) : value == null ? null : String(value)
 }
 
 function EditableCellHost<TData, TValue>(ctx: CellContext<TData, TValue>) {
-  const { editingCell, editingRowId, setEditingCell, setRowDraft, onCellEdit } =
-    useEditingContext<TData>()
+  const editing = useEditingContext<TData>()
+  const meta = ctx.column.columnDef.meta
+  const editable = typeof meta?.isEditable === "function" ? meta.isEditable(ctx.row.original) : meta?.isEditable !== false
+  const active = editing.editingRowId === ctx.row.id || editing.editingCell?.rowId === ctx.row.id && editing.editingCell.colId === ctx.column.id
+  if (active && editable) return <EditableCellEditorHost {...ctx} />
+  return <EditableCellDisplay value={ctx.getValue()} meta={meta} formatted={meta?.formatValue?.(ctx.getValue(), ctx.row.original)} editable={editable} disabled={editing.saving}
+    onStartEdit={() => { if (!editing.savingRef.current && !editing.editingRowId && !editing.editingCell) editing.setEditingCell({ rowId: ctx.row.id, colId: ctx.column.id }) }} />
+}
+
+function EditableCellEditorHost<TData, TValue>(ctx: CellContext<TData, TValue>) {
+  const editing = useEditingContext<TData>()
+  const { editingCell, editingRowId, setEditingCell, setRowDraft, onCellEdit,
+    rowDraft, saving, savingRef, setSaving, fieldErrors, labels, announce } = editing
+  const [error, setError] = useState<string>()
   const colId = ctx.column.id
   const rowId = ctx.row.id
   const isCellEdit = editingCell?.rowId === rowId && editingCell.colId === colId
   const isRowEdit = editingRowId === rowId
-  const isEditing = isCellEdit || isRowEdit
-
+  const errorId = useId()
+  const message = isRowEdit ? fieldErrors[colId] : isCellEdit ? error : undefined
+  const draft = rowDraft[rowId]
+  const updateDraft = (value: unknown) => {
+    setRowDraft((d) => ({ ...d, [rowId]: { ...d[rowId], [colId]: value } }))
+  }
+  const commit = async (value: unknown) => {
+    if (savingRef.current) return
+    if (isRowEdit) { updateDraft(value); return }
+    savingRef.current = true
+    setSaving(true)
+    setError(undefined)
+    try {
+      const validation = await ctx.column.columnDef.meta?.validate?.(value, ctx.row.original)
+      if (validation) { setError(validation); return }
+      if (value !== ctx.getValue()) await onCellEdit?.(ctx.row.original, colId, value)
+      announce("Cell saved.", "success")
+      setEditingCell(null)
+      setRowDraft((d) => { const { [rowId]: _, ...rest } = d; return rest })
+    } catch {
+      setError(labels.saveError)
+      announce(`Cell save failed: ${labels.saveError}`, "error")
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }
   return (
-    <EditableCell
-      {...ctx}
-      isEditing={isEditing}
-      autoOpen={isCellEdit}
-      onStartEdit={() => setEditingCell({ rowId, colId })}
-      onCancel={() => {
-        if (isCellEdit) setEditingCell(null)
-      }}
-      onCommit={(value) => {
-        if (isRowEdit) {
-          setRowDraft((d) => ({
-            ...d,
-            [rowId]: {
-              ...d[rowId],
-              [colId]: value as TData[keyof TData],
-            },
-          }))
-          return
-        }
-        setEditingCell(null)
-        if (value !== ctx.getValue()) {
-          onCellEdit?.(ctx.row.original, colId, value)
-        }
-      }}
-    />
+    <div className="w-full min-w-0" aria-busy={saving && (isCellEdit || isRowEdit)}>
+      <EditableCell
+        {...ctx}
+        hasDraft={!!draft && Object.prototype.hasOwnProperty.call(draft, colId)}
+        draftValue={draft?.[colId as keyof TData]}
+        isEditing={isCellEdit || isRowEdit}
+        autoOpen={isCellEdit}
+        disabled={saving}
+        errorId={message ? errorId : undefined}
+        onDraftChange={updateDraft}
+        onStartEdit={() => {
+          if (savingRef.current || editingRowId || editingCell) return
+          setError(undefined)
+          setEditingCell({ rowId, colId })
+        }}
+        onCancel={() => {
+          if (savingRef.current || !isCellEdit) return
+          setError(undefined)
+          setEditingCell(null)
+          setRowDraft((d) => { const { [rowId]: _, ...rest } = d; return rest })
+        }}
+        onCommit={(value) => { void commit(value) }}
+      />
+      {message && <p id={errorId} role="alert" className="mt-1 text-xs text-destructive">{message}</p>}
+      {saving && isCellEdit && <span role="status" className="text-xs text-muted-foreground">{labels.saving}</span>}
+    </div>
   )
 }
 
 function ActionsCellHost<TData>({ row }: CellContext<TData, unknown>) {
-  const {
-    editingRowId,
-    setEditingRowId,
-    rowDraft,
-    setRowDraft,
-    rowActions,
-    customRowActions,
-    onRowAction,
-    onRowSave,
-    onView,
-    onRequestDelete,
+  const { editingCell, editingRowId, setEditingRowId, rowDraft, setRowDraft,
+    rowActions, customRowActions, onRowAction, onRowSave, onView,
+    onRequestDelete, saving, savingRef, setSaving, setFieldErrors, labels, announce, isNewRow, finishNewRow,
   } = useEditingContext<TData>()
+  const [error, setError] = useState<string>()
   const rowId = row.id
   const isRowEdit = editingRowId === rowId
+  const clearDraft = () => {
+    setRowDraft((d) => { const { [rowId]: _, ...rest } = d; return rest })
+    setFieldErrors({})
+    setError(undefined)
+    setEditingRowId(null)
+  }
+  const save = async () => {
+    if (savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    setError(undefined)
+    setFieldErrors({})
+    try {
+      const draft = rowDraft[rowId] ?? {}
+      const candidate = { ...row.original, ...draft }
+      const errors: Record<string, string> = {}
+      for (const cell of row.getAllCells()) {
+        const meta = cell.column.columnDef.meta
+        const editable = typeof meta?.isEditable === "function"
+          ? meta.isEditable(row.original) : meta?.isEditable !== false
+        if (!(meta?.editor || meta?.renderEditor) || !editable || !meta.validate) continue
+        const value = Object.prototype.hasOwnProperty.call(draft, cell.column.id)
+          ? draft[cell.column.id as keyof TData] : cell.getValue()
+        const message = await meta.validate(value, candidate)
+        if (message) errors[cell.column.id] = message
+      }
+      if (Object.keys(errors).length) {
+        setFieldErrors(errors)
+        const hiddenErrors = row.getAllCells()
+          .filter(cell => !cell.column.getIsVisible() && errors[cell.column.id])
+          .map(cell => errors[cell.column.id])
+        setError([labels.validationError, ...hiddenErrors].join(" "))
+        announce([labels.validationError, ...hiddenErrors].join(" "), "error")
+        return
+      }
+      if (isNewRow(rowId) && !onRowSave) throw new Error("Provide onRowSave to persist new rows.")
+      await onRowSave?.(row.original, draft)
+      finishNewRow(rowId)
+      clearDraft()
+      announce("Row saved.", "success")
+    } catch {
+      setError(labels.saveError)
+      announce(labels.saveError, "error")
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }
   return (
     <DataTableRowActions
       row={row.original}
       actions={rowActions}
       customActions={customRowActions}
       isEditing={isRowEdit}
-      onSaveEdit={() => {
-        onRowSave?.(row.original, rowDraft[rowId] ?? {})
-        setRowDraft((d) => {
-          const { [rowId]: _, ...rest } = d
-          return rest
-        })
-        setEditingRowId(null)
-      }}
-      onCancelEdit={() => {
-        setRowDraft((d) => {
-          const { [rowId]: _, ...rest } = d
-          return rest
-        })
-        setEditingRowId(null)
-      }}
+      isSaving={saving}
+      saveError={isRowEdit ? error : undefined}
+      savingLabel={labels.saving}
+      onSaveEdit={() => { void save() }}
+      onCancelEdit={() => { if (!savingRef.current) { finishNewRow(rowId); clearDraft() } }}
       onAction={(a) => {
         if (a === "edit") {
+          if (savingRef.current || editingRowId || editingCell) return
+          setError(undefined)
+          setFieldErrors({})
           setEditingRowId(rowId)
           return
         }
-        if (a === "view") {
-          onView?.(row.original)
-        } else if (a === "delete") {
-          onRequestDelete?.(row.original)
-          return
-        }
+        if (a === "view") onView?.(row.original)
+        else if (a === "delete") { onRequestDelete?.(row.original); return }
         onRowAction?.(a, row.original)
       }}
     />
@@ -329,11 +424,36 @@ function ActionsCellHost<TData>({ row }: CellContext<TData, unknown>) {
 // ----- types ------------------------------------------------------------
 
 export type DataTableProps<TData extends { id: string | number }> = {
+  format?: { locale?: string; currency?: string; timeZone?: string }
+  conditionalFormatting?: { filter: GridFilter; columnId?: string; style: React.CSSProperties }[]
+  /** Nested cross-column filter. Server adapters receive this unchanged. */
+  filterExpression?: GridFilter
+  direction?: "ltr" | "rtl"
+  /** Server totals must be supplied explicitly; loaded pages cannot calculate query-wide totals. */
+  summary?: { scope: "page" | "filtered" | "server"; columns: Record<string, GridSummaryOperation>; values?: Record<string, number | null>; label?: string }
+  onExportXlsx?: (table: TanstackTable<TData>, fileName: string) => Promise<unknown>
+  enableKeyboardNavigation?: boolean
+  virtualizeRows?: boolean
+  /** Extra rows mounted above/below the visible range. Default 8. */
+  virtualOverscan?: number
+  /** Minimum row height and initial estimate in pixels; taller content is measured. */
+  virtualRowHeight?: number
+  initialGrouping?: string[]
+  /** Group server-provided trees without grouping the loaded page. */
+  manualGrouping?: boolean
+  /** Commit a manual reorder of flat client rows in the current page. */
+  onRowsReorder?: (rows: TData[]) => void
   data?: TData[]
   columns: ColumnDef<TData>[]
 
   /** Optional internal fetcher. Omit this when using controlled `data`. */
   dataSource?: DataTableDataSource<TData>
+  /** Supplied slices are controlled; omitted slices remain internal. */
+  state?: Partial<DataTableState>
+  initialState?: Partial<DataTableState>
+  onStateChange?: (next: DataTableState) => void
+  /** Named filter/layout profiles; browser persistence is opt-in. */
+  savedViews?: DataTableSavedViewsConfig
 
   isLoading?: boolean
   isFetching?: boolean
@@ -377,10 +497,10 @@ export type DataTableProps<TData extends { id: string | number }> = {
    */
   confirmDelete?: ConfirmDeleteConfig<TData> | boolean
 
-  /** Commit a single edited cell. Receives the row, column id and new value. */
-  onCellEdit?: (row: TData, columnId: string, value: unknown) => void
-  /** Commit an entire row in row-edit mode. */
-  onRowSave?: (row: TData, draft: Partial<TData>) => void
+  /** Commit a cell. Return the persistence promise to retain its draft on failure. */
+  onCellEdit?: (row: TData, columnId: string, value: unknown) => void | Promise<unknown>
+  /** Commit a row. Return the persistence promise to retain its draft on failure. */
+  onRowSave?: (row: TData, draft: Partial<TData>) => void | Promise<unknown>
   /** Build a fresh empty row when "Add row" is clicked. */
   onAddRow?: () => Partial<TData>
   /** Bulk delete selected rows. */
@@ -461,6 +581,9 @@ const DEFAULT_LABELS: Required<DataTableLabels> = {
   loadError: "Could not load rows.",
   retry: "Retry",
   refreshing: "Refreshing",
+  saving: "Saving…",
+  saveError: "Could not save changes. Try again.",
+  validationError: "Please fix the highlighted fields and save again.",
   rowsPerPage: "Rows per page",
   page: "Page",
   of: "of",
@@ -477,9 +600,13 @@ const EMPTY_DATA: never[] = []
 // ----- component --------------------------------------------------------
 
 export function DataTable<TData extends { id: string | number }>({
-  data,
+  filterExpression, direction, summary, format, conditionalFormatting,
+  initialGrouping, manualGrouping = false,
+  data, onRowsReorder,
   columns,
   dataSource,
+  state: controlledState, initialState, onStateChange, savedViews,
+  onExportXlsx, enableKeyboardNavigation = false, virtualizeRows = false, virtualOverscan = 8, virtualRowHeight,
   isLoading,
   isFetching,
   onRefresh,
@@ -521,6 +648,7 @@ export function DataTable<TData extends { id: string | number }>({
 }: DataTableProps<TData>) {
   const labels: Required<DataTableLabels> = { ...DEFAULT_LABELS, ...labelsProp }
   const f: Required<DataTableFeatures> = {
+    grouping: features?.grouping ?? !!initialGrouping?.length,
     search: features?.search ?? true,
     refresh: features?.refresh ?? !!(onRefresh || dataSource),
     columnVisibility: features?.columnVisibility ?? true,
@@ -533,6 +661,14 @@ export function DataTable<TData extends { id: string | number }>({
     reordering: features?.reordering ?? true,
     pinning: features?.pinning ?? true,
   }
+  const createViewBaseline = useRef({
+    sorting: initialState?.sorting ?? initialSorting ?? [],
+    columnFilters: initialState?.columnFilters ?? [],
+    globalFilter: initialState?.globalFilter ?? "",
+    columnVisibility: initialState?.columnVisibility ?? initialColumnVisibility ?? {},
+    columnPinning: initialState?.columnPinning ?? initialColumnPinning ?? { left: [], right: [] },
+    columnSizing: initialState?.columnSizing ?? {}, columnOrder: initialState?.columnOrder ?? [],
+  })
   // ----- theme resolution ----------------------------------------------
   // `theme` can be a flat token map OR a `{ light, dark }` moded shape.
   // When `isolate` is true, fall back to bundled neutral defaults instead
@@ -604,45 +740,29 @@ export function DataTable<TData extends { id: string | number }>({
   }
 
   // ----- state ----------------------------------------------------------
-  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [internalGlobalFilter, setInternalGlobalFilter] = useState("")
-  const isControlledFilter = globalFilterProp !== undefined
-  const globalFilter = isControlledFilter
-    ? globalFilterProp
-    : internalGlobalFilter
-  const setGlobalFilter = (v: string) => {
-    if (isControlledFilter) onGlobalFilterChange?.(v)
-    else setInternalGlobalFilter(v)
-  }
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    initialColumnVisibility ?? {}
-  )
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>(() => {
-    const base = initialColumnPinning ?? { left: [], right: [] }
-    const left = [...(base.left ?? [])]
-    const right = [...(base.right ?? [])]
-    const hasExpandColumn = !!(renderSubRow || getSubRows)
-    // Keep __expand glued to __select: if __select is pinned left and the
-    // table has an expand column, ensure __expand sits right after it on
-    // the left side regardless of user-supplied pin config.
-    if (
-      hasExpandColumn &&
-      left.includes("__select") &&
-      !left.includes("__expand")
-    ) {
-      const idx = left.indexOf("__select")
-      left.splice(idx + 1, 0, "__expand")
-    }
-    return { left, right }
+  const tableState = useDataTableState({
+    initial: {
+      grouping: initialGrouping ?? [], sorting: initialSorting ?? [], columnVisibility: initialColumnVisibility ?? {},
+      columnPinning: initialColumnPinning ?? { left: [], right: [] },
+      pagination: { pageIndex: 0, pageSize: initialPageSize }, ...initialState,
+    },
+    controlled: controlledState, onChange: onStateChange,
+    globalFilter: globalFilterProp, onGlobalFilterChange,
   })
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({})
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [expanded, setExpanded] = useState<ExpandedState>({})
-  const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: initialPageSize,
-  })
+  const { sorting, columnFilters, globalFilter, columnVisibility, columnPinning,
+    columnSizing, rowSelection, expanded, pagination, columnOrder } = tableState.state
+  const grouping = tableState.state.grouping ?? []
+  const setGrouping = (value: React.SetStateAction<string[]>) => tableState.set("grouping", previous => typeof value === "function" ? value(previous ?? []) : value)
+  const setSorting = (value: React.SetStateAction<SortingState>) => tableState.set("sorting", value)
+  const setColumnFilters = (value: React.SetStateAction<ColumnFiltersState>) => tableState.set("columnFilters", value)
+  const setGlobalFilter = (value: React.SetStateAction<string>) => tableState.set("globalFilter", value)
+  const setColumnVisibility = (value: React.SetStateAction<VisibilityState>) => tableState.set("columnVisibility", value)
+  const setColumnPinning = (value: React.SetStateAction<ColumnPinningState>) => tableState.set("columnPinning", value)
+  const setColumnSizing = (value: React.SetStateAction<ColumnSizingState>) => tableState.set("columnSizing", value)
+  const setRowSelection = (value: React.SetStateAction<RowSelectionState>) => tableState.set("rowSelection", value)
+  const setExpanded = (value: React.SetStateAction<ExpandedState>) => tableState.set("expanded", value)
+  const setPagination = (value: React.SetStateAction<PaginationState>) => tableState.set("pagination", value)
+  const setColumnOrder = (value: React.SetStateAction<ColumnOrderState>) => tableState.set("columnOrder", value)
   const [sourceRows, setSourceRows] = useState<TData[]>(
     () => dataSource?.initialData ?? []
   )
@@ -660,6 +780,16 @@ export function DataTable<TData extends { id: string | number }>({
     colId: string
   } | null>(null)
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ message: string; kind: "success" | "error" } | null>(null)
+  const announce = (message: string, kind: "success" | "error") => setFeedback({ message, kind })
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), feedback.kind === "error" ? 8000 : 3500)
+    return () => clearTimeout(timer)
+  }, [feedback])
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [rowDraft, setRowDraft] = useState<Record<string, Partial<TData>>>({})
 
   const dataSourceEnabled = !!dataSource && dataSource.enabled !== false
@@ -672,20 +802,21 @@ export function DataTable<TData extends { id: string | number }>({
     if (!dataSourceEnabled || !dataSource) return
 
     let cancelled = false
+    const controller = new AbortController()
     const isInitialLoad = sourceRows.length === 0
 
     setSourceError(null)
     setSourceLoading(isInitialLoad)
     setSourceFetching(!isInitialLoad)
 
-    dataSource
-      .fetchRows({
+    Promise.resolve().then(() => dataSource.fetchRows({
+        grouping, filterExpression, signal: controller.signal,
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         sorting,
         columnFilters,
         globalFilter,
-      })
+      }))
       .then((result) => {
         if (cancelled) return
         const rows = Array.isArray(result) ? result : result.rows
@@ -712,6 +843,7 @@ export function DataTable<TData extends { id: string | number }>({
 
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [
     dataSourceEnabled,
@@ -722,14 +854,16 @@ export function DataTable<TData extends { id: string | number }>({
     sorting,
     columnFilters,
     globalFilter,
+    grouping, filterExpression,
     labels.loadError,
     labels.refreshing,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     ...dataSourceDeps,
   ])
 
-  const baseData = dataSourceEnabled ? sourceRows : (data ?? EMPTY_DATA)
-  const effectiveIsLoading = dataSourceEnabled ? sourceLoading : isLoading
+  const rawData = dataSourceEnabled ? sourceRows : (data ?? EMPTY_DATA)
+  const baseData = useMemo(() => filterExpression && !isServerSideDataSource ? rawData.filter(row => matchesGridFilter(row, filterExpression)) : rawData, [rawData, filterExpression, isServerSideDataSource])
+  const dataIsLoading = dataSourceEnabled ? sourceLoading : isLoading
   const effectiveIsFetching = dataSourceEnabled ? sourceFetching : isFetching
   const effectiveOnRefresh = dataSourceEnabled
     ? () => setSourceRefreshKey((key) => key + 1)
@@ -748,10 +882,14 @@ export function DataTable<TData extends { id: string | number }>({
       : mergedData.length)
 
   // ----- column augmentation -------------------------------------------
+  const reorderedData = useRef<TData[] | null>(null)
+  const allowMove = !!onRowsReorder && !!data && !dataSourceEnabled && !virtualizeRows && !getSubRows
+    && !sorting.length && !grouping.length && !filterExpression && !extraRows.length
+    && !editingRowId && !editingCell && !effectiveIsFetching && !(expanded === true || Object.values(expanded).some(Boolean))
   const augmentedColumns = useMemo<ColumnDef<TData>[]>(() => {
     const wrap = (col: ColumnDef<TData>): ColumnDef<TData> => {
-      const meta = col.meta
-      const hasEditor = !!meta?.editor
+      const meta = format ? { ...col.meta, format: { ...format, ...col.meta?.format } } : col.meta
+      const hasEditor = !!(meta?.editor || meta?.renderEditor)
       const id = col.id ?? (col as { accessorKey?: string }).accessorKey
 
       const original = col.cell
@@ -781,6 +919,7 @@ export function DataTable<TData extends { id: string | number }>({
 
       return {
         ...col,
+        meta,
         filterFn: col.filterFn ?? defaultFilterFn,
         header:
           typeof col.header === "function"
@@ -852,20 +991,17 @@ export function DataTable<TData extends { id: string | number }>({
         ),
         cell: ({ row }) => (
           <div className="flex items-center justify-center px-1">
-            <Checkbox
-              checked={row.getIsSelected()}
-              onCheckedChange={(c) => row.toggleSelected(!!c)}
-              aria-label="Select row"
-            />
+            <input type="checkbox" className="dyno-row-checkbox" checked={row.getIsSelected()}
+              onChange={event => row.toggleSelected(event.target.checked)} aria-label="Select row" />
           </div>
         ),
       })
     }
 
-    if (rowActions.length || customRowActions?.length) {
+    if (rowActions.length || customRowActions?.length || onAddRow || onRowSave) {
       built.push({
         id: "__actions",
-        size: 56,
+        size: 80,
         enableSorting: false,
         enableHiding: false,
         enableResizing: false,
@@ -874,43 +1010,55 @@ export function DataTable<TData extends { id: string | number }>({
       })
     }
 
+    if (allowMove && onRowsReorder) built.unshift({
+      id: "__move", size: 42, enableSorting: false, enableHiding: false, enableResizing: false,
+      header: () => null,
+      cell: ({ row, table }) => <RowGrip row={row} table={table} commit={next => { reorderedData.current = next; onRowsReorder(next) }} />,
+    })
     return built
   }, [
-    columns,
+    columns, format, allowMove, onRowsReorder,
     enableSelection,
     renderSubRow,
     getSubRows,
     rowActions.length,
     customRowActions?.length,
+    onAddRow, onRowSave,
   ])
 
-  // initial column order
-  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() =>
-    augmentedColumns.map(
-      (c) => c.id ?? (c as { accessorKey?: string }).accessorKey ?? ""
-    )
-  )
+  // Append newly enabled utility columns while keeping user order intact.
   useEffect(() => {
-    const next = augmentedColumns.map(
-      (c) => c.id ?? (c as { accessorKey?: string }).accessorKey ?? ""
-    )
-    setColumnOrder((prev) => {
-      // preserve user-reordered positions; append new columns at the end
-      const existing = prev.filter((id) => next.includes(id))
-      const added = next.filter((id) => !prev.includes(id))
-      const final = [...existing, ...added]
-      return final.length === prev.length &&
-        final.every((v, i) => prev[i] === v)
-        ? prev
-        : final
+    const ids = augmentedColumns.map(c => c.id ?? (c as { accessorKey?: string }).accessorKey ?? "")
+    tableState.set("columnOrder", previous => {
+      const utility = ["__move", "__select", "__expand"].filter(id => ids.includes(id))
+      const existing = previous.filter(id => ids.includes(id) && !utility.includes(id))
+      const next = [...utility, ...existing, ...ids.filter(id => !previous.includes(id) && !utility.includes(id))]
+      return next.length === previous.length && next.every((id, i) => previous[i] === id) ? previous : next
     })
-  }, [augmentedColumns])
+    // Maintain the existing expand/selection adjacency for internally pinned columns.
+    if (initialState?.columnPinning === undefined && controlledState?.columnPinning === undefined
+      && (renderSubRow || getSubRows)) {
+      tableState.set("columnPinning", previous => {
+        const left = previous.left ?? []
+        if (!left.includes("__select") || left.includes("__expand")) return previous
+        const next = [...left]
+        next.splice(next.indexOf("__select") + 1, 0, "__expand")
+        return { ...previous, left: next }
+      })
+    }
+  }, [augmentedColumns, tableState.set])
+
+  const coreModel = useProgressiveRowModel(mergedData, !getSubRows && mergedData.length >= 2000)
+  useEffect(() => { reorderedData.current = null }, [mergedData])
+  const effectiveIsLoading = dataIsLoading || coreModel.preparing
 
   // ----- table ----------------------------------------------------------
   const table = useReactTable({
     data: mergedData,
+    autoResetPageIndex: mergedData === reorderedData.current ? false : undefined,
     columns: augmentedColumns,
     state: {
+      grouping,
       sorting,
       columnFilters,
       globalFilter,
@@ -922,6 +1070,10 @@ export function DataTable<TData extends { id: string | number }>({
       expanded,
       pagination,
     },
+    onGroupingChange: setGrouping,
+    enableGrouping: f.grouping,
+    groupedColumnMode: false,
+    manualGrouping: manualGrouping || isServerSideDataSource,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
@@ -938,7 +1090,7 @@ export function DataTable<TData extends { id: string | number }>({
     enableColumnResizing: f.resizing,
     columnResizeMode: "onChange",
     enableRowSelection: enableSelection,
-    enableExpanding: !!(renderSubRow || getSubRows),
+    enableExpanding: f.grouping || !!(renderSubRow || getSubRows),
     enablePinning: f.pinning,
     manualPagination: isServerSideDataSource || !f.pagination,
     manualSorting: isServerSideDataSource,
@@ -949,6 +1101,7 @@ export function DataTable<TData extends { id: string | number }>({
     getRowId: (row) => String(row.id),
     getSubRows,
     getRowCanExpand: (row) => {
+      if (row.getIsGrouped()) return true
       if (renderSubRow) return true
       const subs = getSubRows?.(row.original)
       return !!subs && subs.length > 0
@@ -966,8 +1119,9 @@ export function DataTable<TData extends { id: string | number }>({
     filterFns: {
       // attached via columnDef.filterFn below where needed
     },
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: coreModel.getCoreRowModel,
     getFilteredRowModel: getFilteredRowModel(),
+    getGroupedRowModel: getGroupedRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -1040,31 +1194,47 @@ export function DataTable<TData extends { id: string | number }>({
   // ----- "add row" handling --------------------------------------------
   const handleAddRow = onAddRow
     ? () => {
+        if (savingRef.current || editingCell || editingRowId) return
         const draft = onAddRow()
-        const tempId = `__new_${Date.now()}`
-        const newRow = { id: tempId, ...draft } as unknown as TData
+        const newRow = { ...draft, id: draft.id ?? `__new_${crypto.randomUUID()}` } as unknown as TData
         setExtraRows((r) => [newRow, ...r])
-        setPagination((p) => ({ ...p, pageIndex: 0 }))
-        setEditingRowId(tempId)
+        tableState.update(previous => ({ ...previous, globalFilter: "", columnFilters: [], sorting: [], pagination: { ...previous.pagination, pageIndex: 0 } }))
+        setEditingRowId(String(newRow.id))
       }
     : undefined
 
   // ----- render ---------------------------------------------------------
   const rows = table.getRowModel().rows
+  const viewport = useRef<HTMLDivElement>(null)
+  const virtualEnabled = virtualizeRows
+  const scrollVirtualRow = useRef<((index: number) => void) | null>(null)
+  const navigation = useGridNavigation({ enabled: enableKeyboardNavigation, root: gridRoot, rows,
+    saving, editing: !!editingCell || !!editingRowId,
+    startEdit: (rowId, colId) => { if (!editingRowId && !editingCell) setEditingCell({ rowId, colId }) },
+    scrollToRow: index => { if (virtualEnabled && index >= 0) scrollVirtualRow.current?.(index) },
+  })
+  useEffect(() => { if (virtualEnabled) viewport.current?.scrollTo({ top: 0 }) }, [globalFilter, columnFilters, sorting, pagination.pageIndex, virtualEnabled])
+
   const selectionCallback = useRef(onSelectionChange)
   selectionCallback.current = onSelectionChange
   useEffect(() => {
+    if (coreModel.preparing) return
     selectionCallback.current?.(
-      table.getSelectedRowModel().flatRows.map((row) => row.original)
+      table.getSelectedRowModel().flatRows.filter(row => !row.getIsGrouped()).map((row) => row.original)
     )
-  }, [rowSelection, mergedData, table])
+  }, [rowSelection, mergedData, table, coreModel.preparing])
   const visibleLeafCount = table.getVisibleLeafColumns().length
 
   const editingContextValue = useMemo<EditingContextValue<TData>>(
     () => ({
+      formattingRules: conditionalFormatting,
+      isNewRow: id => extraRows.some(row => String(row.id) === id),
+      finishNewRow: id => setExtraRows(previous => previous.filter(row => String(row.id) !== id)),
+      announce,
       editingCell,
       editingRowId,
       rowDraft,
+      saving, savingRef, setSaving, fieldErrors, setFieldErrors, labels,
       setEditingCell,
       setEditingRowId,
       setRowDraft,
@@ -1078,8 +1248,10 @@ export function DataTable<TData extends { id: string | number }>({
     }),
     [
       editingCell,
+      conditionalFormatting,
       editingRowId,
       rowDraft,
+      extraRows, saving, fieldErrors, labelsProp,
       rowActions,
       customRowActions,
       onRowAction,
@@ -1102,7 +1274,7 @@ export function DataTable<TData extends { id: string | number }>({
         value={editingContextValue as unknown as EditingContextValue<unknown>}
       >
         <div
-          ref={setGridRoot}
+          ref={setGridRoot} dir={direction}
           data-dyno-grid={instanceId}
           className={cn(
             "relative flex flex-col rounded-lg border bg-card text-card-foreground shadow-sm",
@@ -1111,6 +1283,9 @@ export function DataTable<TData extends { id: string | number }>({
           )}
           style={darkCss ? undefined : lightStyle}
         >
+          {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className="absolute bottom-3 right-3 z-50 max-w-sm rounded-md border bg-popover px-3 py-2 text-sm shadow-lg" data-save-feedback={feedback.kind}>
+            <span>{feedback.message}</span><button type="button" aria-label="Dismiss save notification" className="ml-3 inline-flex align-middle" onClick={() => setFeedback(null)}><XIcon className="size-3" /></button>
+          </div>}
           {darkCss && (
             <style>
               {`[data-dyno-grid="${instanceId}"]{${lightCss}}`}
@@ -1121,7 +1296,9 @@ export function DataTable<TData extends { id: string | number }>({
               {`[data-dyno-grid="${instanceId}"].light{${lightCss}}`}
             </style>
           )}
+          {f.grouping && <div className="dyno-group-controls"><span>Group by</span>{table.getAllLeafColumns().filter(c=>!c.id.startsWith('__')&&c.getCanGroup()).map(c=><button key={c.id} type="button" aria-pressed={grouping.includes(c.id)} disabled={effectiveIsLoading||saving} onClick={()=>{setGrouping(grouping.includes(c.id)?grouping.filter(id=>id!==c.id):[...grouping,c.id]);setExpanded({});setPagination(p=>({...p,pageIndex:0}))}}>{c.columnDef.meta?.label ?? c.id}{grouping.includes(c.id)?` (${grouping.indexOf(c.id)+1})`:''}</button>)}{grouping.length>0&&<><button onClick={()=>table.toggleAllRowsExpanded(true)}>Expand all groups</button><button onClick={()=>table.toggleAllRowsExpanded(false)}>Collapse all groups</button><button onClick={()=>setGrouping([])}>Clear grouping</button>{isServerSideDataSource&&!manualGrouping&&<span>Grouping must be implemented by your server adapter.</span>}</>}</div>}
           <DataTableToolbar
+            onExportXlsx={onExportXlsx}
             table={table}
             totalRecords={effectiveTotalRecords}
             isFetching={effectiveIsFetching}
@@ -1134,32 +1311,42 @@ export function DataTable<TData extends { id: string | number }>({
               setGlobalFilter(v)
               table.setPageIndex(0)
             }}
-            toolbarSlot={toolbarSlot}
+            toolbarSlot={<>
+              {savedViews && <SavedViewsControl config={savedViews}
+                state={tableState.state} disabled={saving || !!editingCell || !!editingRowId}
+                baseline={createViewBaseline.current}
+                onApply={view => tableState.update(previous => ({ ...previous, ...view,
+                  pagination: { ...previous.pagination, pageIndex: 0 } }))} />}
+              {toolbarSlot}
+            </>}
             features={f}
             labels={labels}
           />
 
-          <div className="relative w-full overflow-auto" style={{ maxHeight }}>
-            <table
-              aria-label={ariaLabel}
+          {enableKeyboardNavigation && <span className="sr-only" aria-live="polite">{navigation.current ? `Row ${rows.findIndex(row => row.id === navigation.current?.row) + 1} of ${rows.length}, column ${navigation.current.column}. Arrow keys navigate; Enter or F2 edits; Escape cancels.` : "No cells."}</span>}
+          {coreModel.preparing && <div role="status" className="flex items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground"><Loader2Icon className="size-3 animate-spin" />Preparing rows… {coreModel.progress.toLocaleString()} / {mergedData.length.toLocaleString()}</div>}
+          <div data-grid-scrollbar="" ref={viewport} onKeyDown={navigation.onKeyDown} className="relative w-full overflow-auto" style={{ maxHeight: virtualizeRows ? maxHeight ?? "480px" : maxHeight }}>
+            <table data-virtual-table={virtualEnabled ? "" : undefined}
+              role="table" aria-label={ariaLabel}
+              aria-rowcount={enableKeyboardNavigation || virtualizeRows ? rows.length + 1 : undefined}
               className={cn(
-                "w-full caption-bottom text-sm",
-                striped && "[&_tbody>tr:nth-child(even)]:bg-muted/25"
+                "w-full caption-bottom text-sm"
               )}
               style={{
-                width: table.getCenterTotalSize() ? undefined : "100%",
+                display: virtualEnabled ? "grid" : undefined,
+                width: virtualEnabled ? table.getTotalSize() : table.getCenterTotalSize() ? undefined : "100%",
                 minWidth: "100%",
               }}
             >
-              <thead
+              <thead role="rowgroup" style={{ display: virtualEnabled ? "grid" : undefined }}
                 className={cn("bg-card", stickyHeader && "sticky top-0 z-10")}
               >
                 {table.getHeaderGroups().map((hg) => (
-                  <tr key={hg.id} className="border-b">
+                  <tr role="row" key={hg.id} className="border-b" style={{ display: virtualEnabled ? "flex" : undefined }}>
                     {hg.headers.map((header) => {
                       const meta = header.column.columnDef.meta
                       const isUtility =
-                        header.column.id === "__select" ||
+                        header.column.id === "__move" || header.column.id === "__select" ||
                         header.column.id === "__expand" ||
                         header.column.id === "__actions"
                       const isPinned = !!header.column.getIsPinned()
@@ -1169,7 +1356,7 @@ export function DataTable<TData extends { id: string | number }>({
                       const isBeingDragged =
                         canReorder && activeReorderId === header.column.id
                       return (
-                        <th
+                        <th role="columnheader"
                           key={header.id}
                           colSpan={header.colSpan}
                           data-col-id={header.column.id}
@@ -1188,7 +1375,7 @@ export function DataTable<TData extends { id: string | number }>({
                             canReorder ? onHeaderPointerUp : undefined
                           }
                           style={{
-                            width: header.getSize(),
+                            width: header.getSize(), flexShrink: virtualEnabled ? 0 : undefined,
                             ...getPinningStyles(header.column),
                             ...(isPinned ? { zIndex: 2 } : {}),
                           }}
@@ -1239,9 +1426,13 @@ export function DataTable<TData extends { id: string | number }>({
                 ))}
               </thead>
 
-              <tbody>
+              {virtualEnabled && !effectiveIsLoading && rows.length > 0 ? <VirtualTableRows rows={rows} viewport={viewport} density={density}
+                    overscan={virtualOverscan} estimatedHeight={virtualRowHeight} expanded={expanded} renderState={tableState.state} striped={striped}
+                    columnCount={visibleLeafCount} renderSubRow={renderSubRow}
+                    editingId={editingRowId ?? editingCell?.rowId} editingRowId={editingRowId}
+                    navigation={enableKeyboardNavigation ? navigation : undefined} scrollRow={scrollVirtualRow} /> : <tbody role="rowgroup" style={virtualEnabled ? {display:"grid",width:"100%"} : undefined}>
                 {effectiveIsLoading ? (
-                  renderSkeleton(visibleLeafCount, pagination.pageSize)
+                  renderSkeleton(table.getVisibleLeafColumns(), Math.min(20, pagination.pageSize), virtualEnabled)
                 ) : sourceError && rows.length === 0 ? (
                   <tr>
                     <td
@@ -1274,16 +1465,18 @@ export function DataTable<TData extends { id: string | number }>({
                     </td>
                   </tr>
                 ) : (
-                  rows.map((row) => (
-                    <DataTableRow
-                      key={row.id}
-                      row={row}
-                      renderSubRow={renderSubRow}
-                      isRowEditing={editingRowId === row.id}
-                    />
+rows.map((row, index) => (
+                    <DataTableRow key={row.id} row={row} index={index} striped={striped} renderSubRow={renderSubRow}
+                      isRowEditing={editingRowId === row.id} navigation={enableKeyboardNavigation ? navigation : undefined} />
                   ))
                 )}
-              </tbody>
+              </tbody>}
+              {summary && <tfoot style={virtualEnabled ? { display: "block", position: "sticky", bottom: 0, background: "var(--background)", zIndex: 2 } : { position: "sticky", bottom: 0, background: "var(--background)", zIndex: 2 }}><tr style={virtualEnabled ? { display: "flex" } : undefined}>{table.getVisibleLeafColumns().map((column, index) => {
+                const operation = summary.columns[column.id]
+                const source = summary.scope === "page" ? table.getRowModel() : table.getFilteredRowModel()
+                const value = summary.scope === "server" ? summary.values?.[column.id] : isServerSideDataSource && summary.scope === "filtered" ? undefined : operation ? summarizeGridValues(source.flatRows.filter(row => !row.getIsGrouped()).map(row => row.getValue(column.id)), operation) : undefined
+                return <td key={column.id} style={{ width: column.getSize(), flexShrink: 0, ...getPinningStyles(column) }} className="border-t px-2 py-2 text-sm font-medium">{index === 0 ? `${summary.label ?? "Summary"}${value == null ? "" : ": " + value.toLocaleString()}` : value == null ? "—" : value.toLocaleString()}</td>
+              })}</tr></tfoot>}
             </table>
 
             {effectiveIsFetching && !effectiveIsLoading && (
@@ -1307,6 +1500,14 @@ export function DataTable<TData extends { id: string | number }>({
             open={viewRow != null}
             onOpenChange={(o) => !o && setViewRow(null)}
             config={viewSheetConfig}
+            onEdit={onRowSave ? row => {
+              if (savingRef.current || editingRowId || editingCell) return
+              const index = table.getPrePaginationRowModel().rows.findIndex(item => item.id === String(row.id))
+              if (index < 0) return
+              if (f.pagination) setPagination(previous => ({ ...previous, pageIndex: Math.floor(index / previous.pageSize) }))
+              setViewRow(null); setFieldErrors({}); setEditingRowId(String(row.id))
+            } : undefined}
+            onDelete={onDelete ? row => { setViewRow(null); handleDeleteRequest(row) } : undefined}
           />
           <DataTableConfirmDelete
             open={confirmCtx != null}
@@ -1321,24 +1522,88 @@ export function DataTable<TData extends { id: string | number }>({
   )
 }
 
+function VirtualTableRows<T>({ rows, viewport, density, overscan, estimatedHeight, expanded,
+  columnCount, renderSubRow, editingId, editingRowId, navigation, scrollRow, renderState, striped }: {
+  rows: Row<T>[]; viewport: React.RefObject<HTMLDivElement | null>; density: DataTableDensity
+  overscan: number; estimatedHeight?: number; expanded: ExpandedState; columnCount: number; renderState: DataTableState; striped: boolean
+  renderSubRow?: (row: T) => React.ReactNode; editingId?: string | null; editingRowId?: string | null
+  navigation?: ReturnType<typeof useGridNavigation<T>>; scrollRow: React.RefObject<((index: number) => void) | null>
+}) {
+  const entries = useMemo(() => rows.flatMap((row, rowIndex) => {
+    const item = { row, rowIndex, detail: false, key: row.id }
+    return renderSubRow && !row.getIsGrouped() && row.getIsExpanded() ? [item, { ...item, detail: true, key: row.id + "::detail" }] : [item]
+  }), [rows, expanded, renderSubRow])
+  const editingIndex = useMemo(() => editingId ? entries.findIndex(item => !item.detail && item.row.id === editingId) : -1, [entries, editingId])
+  const rangeExtractor = useCallback((range: Parameters<typeof defaultRangeExtractor>[0]) => {
+    const indexes = defaultRangeExtractor(range)
+    if (editingIndex >= 0 && !indexes.includes(editingIndex)) indexes.push(editingIndex)
+    return indexes.sort((a, b) => a - b)
+  }, [editingIndex])
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLTableRowElement>({
+    directDomUpdates: true, directDomUpdatesMode: "position",
+    count: entries.length, getScrollElement: () => viewport.current,
+    estimateSize: useCallback((index: number) => entries[index].detail ? 100 : estimatedHeight ?? (density === "compact" ? 36 : density === "comfortable" ? 52 : 40), [entries, density, estimatedHeight]),
+    getItemKey: useCallback((index: number) => entries[index].key, [entries]),
+    measureElement: (element, entry, instance) => {
+      const box = entry?.borderBoxSize?.[0]
+      if (box) return Math.round(box.blockSize)
+      const index = instance.indexFromElement(element)
+      return instance.itemSizeCache.get(instance.options.getItemKey(index)) ?? instance.options.estimateSize(index)
+    },
+    useAnimationFrameWithResizeObserver: true,
+    overscan: Math.max(1, Math.min(100, overscan)), rangeExtractor,
+  })
+  useEffect(() => {
+    scrollRow.current = index => {
+      const position = entries.findIndex(item => !item.detail && item.rowIndex === index)
+      if (position >= 0) virtualizer.scrollToIndex(position, { align: "auto" })
+    }
+    return () => { scrollRow.current = null }
+  }, [entries, scrollRow, virtualizer])
+  const items = virtualizer.getVirtualItems()
+  return <tbody role="rowgroup" ref={virtualizer.containerRef} style={{ display: "grid", position: "relative", width: "100%" }}>
+    {items.map(item => {
+      const entry = entries[item.index]
+      return entry.detail ? <tr role="row" key={item.key} ref={virtualizer.measureElement} data-index={item.index} data-virtual-detail=""
+        style={{ position: "absolute", display: "flex", width: "100%", minHeight: 100 }} className="border-b bg-muted/30">
+        <td role="cell" style={{ width: "100%" }} className="p-3"><div className="rounded-md border bg-background p-3">{renderSubRow?.(entry.row.original)}</div></td>
+      </tr> : <MemoDataTableRow key={item.key} virtual striped={striped} logicalIndex={entry.rowIndex} minimumHeight={estimatedHeight ?? (density === "compact" ? 36 : density === "comfortable" ? 52 : 40)} row={entry.row} index={item.index} measure={virtualizer.measureElement}
+        renderState={renderState} isRowEditing={editingRowId === entry.row.id} navigation={navigation} />
+    })}
+  </tbody>
+}
+
 function DataTableRow<TData>({
   row,
   renderSubRow,
   isRowEditing,
+  index, measure, navigation, virtual, minimumHeight, striped, logicalIndex,
 }: {
+  virtual?: boolean
+  striped?: boolean
+  logicalIndex?: number
+  minimumHeight?: number
+  renderState?: DataTableState
+  index?: number
+  measure?: (element: HTMLTableRowElement | null) => void
+  navigation?: ReturnType<typeof useGridNavigation<TData>>
   row: Row<TData>
   renderSubRow?: (row: TData) => React.ReactNode
   isRowEditing?: boolean
 }) {
+  const { formattingRules } = useEditingContext<TData>()
   const expanded = row.getIsExpanded()
   const isSelected = row.getIsSelected()
   return (
     <>
-      <tr
+      <tr role="row" style={virtual ? { position: "absolute", display: "flex", width: "100%", minHeight: minimumHeight } : undefined}
+        ref={measure} data-index={index} aria-rowindex={index == null ? undefined : index + 2}
+        data-row-editing={isRowEditing ? "true" : undefined}
         data-state={isSelected ? "selected" : undefined}
         className={cn(
           "group/row border-b transition-colors hover:bg-muted/40 data-[state=selected]:bg-primary/5",
           isRowEditing && "bg-amber-500/5",
+          striped && (logicalIndex ?? index ?? row.index) % 2 === 1 && "bg-muted/25",
           row.depth > 0 && "bg-muted/20"
         )}
       >
@@ -1346,14 +1611,20 @@ function DataTableRow<TData>({
           const meta = cell.column.columnDef.meta
           const isPinned = !!cell.column.getIsPinned()
           return (
-            <td
+            <td role="cell"
               key={cell.id}
+              data-nav-cell={navigation ? "" : undefined} data-nav-row={row.id} data-nav-column={cell.column.id}
+              tabIndex={navigation ? navigation.current?.row === row.id && navigation.current.column === cell.column.id ? 0 : -1 : undefined}
+              onFocus={navigation ? event => { if (event.target === event.currentTarget) navigation.setActive({ row: row.id, column: cell.column.id }) } : undefined}
               style={{
                 width: cell.column.getSize(),
+                ...(virtual ? { flexShrink: 0, display: "flex", alignItems: "center", minWidth: 0, justifyContent: cell.column.id === "__actions" ? "flex-end" : meta?.align === "right" ? "flex-end" : meta?.align === "center" ? "center" : undefined } : {}),
+                ...(!row.getIsGrouped() ? meta?.cellStyle?.(cell.getValue(), row.original) : {}),
+                ...(!row.getIsGrouped() ? Object.assign({}, ...formattingRules?.filter(rule => (!rule.columnId || rule.columnId === cell.column.id) && matchesGridFilter(row.original as object, rule.filter)).map(rule => rule.style) ?? []) : {}),
                 ...getPinningStyles(cell.column),
               }}
               className={cn(
-                "px-2 py-1 align-middle text-sm",
+                "px-2 py-1 align-middle text-sm outline-none focus-visible:bg-primary/10",
                 isPinned &&
                   "bg-card group-hover/row:bg-[color-mix(in_oklab,var(--card),var(--muted)_40%)] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--card),var(--primary)_5%)]",
                 isPinned &&
@@ -1362,12 +1633,15 @@ function DataTableRow<TData>({
                 meta?.cellClassName
               )}
             >
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              {cell.getIsGrouped() ? <button type="button" className="inline-flex items-center gap-2 font-medium" onClick={row.getToggleExpandedHandler()} aria-expanded={row.getIsExpanded()} aria-label={`${row.getIsExpanded() ? "Collapse" : "Expand"} group ${String(cell.getValue())}`}>
+                {row.getIsExpanded() ? <ChevronDownIcon className="size-4"/> : <ChevronRightIcon className="size-4"/>}{String(cell.getValue() ?? 'Empty')} <span className="text-xs text-muted-foreground">({row.getLeafRows().filter(r=>!r.getIsGrouped()).length})</span></button>
+              : row.getIsGrouped() ? cell.column.id.startsWith('__') || cell.getIsPlaceholder() ? null : cell.getIsAggregated() ? cell.column.columnDef.aggregatedCell ? flexRender(cell.column.columnDef.aggregatedCell,cell.getContext()) : String(cell.getValue() ?? '') : null
+              : flexRender(cell.column.columnDef.cell, cell.getContext())}
             </td>
           )
         })}
       </tr>
-      {expanded && renderSubRow && (
+      {expanded && !row.getIsGrouped() && renderSubRow && (
         <tr className="border-b bg-muted/30">
           <td colSpan={row.getVisibleCells().length} className="p-3">
             <div className="rounded-md border bg-background p-3 shadow-inner">
@@ -1380,11 +1654,13 @@ function DataTableRow<TData>({
   )
 }
 
-function renderSkeleton(cols: number, rows: number) {
+const MemoDataTableRow = memo(DataTableRow) as typeof DataTableRow
+
+function renderSkeleton<T>(columns: TanstackTable<T>["getVisibleLeafColumns"] extends () => infer C ? C : never, rows: number, virtual: boolean) {
   return Array.from({ length: rows }).map((_, r) => (
-    <tr key={r} className="border-b">
-      {Array.from({ length: cols }).map((__, c) => (
-        <td key={c} className="px-2 py-2">
+    <tr role="row" key={r} className="border-b" data-loading-row="" style={virtual ? {display:"flex",width:"100%"} : undefined}>
+      {columns.map((column) => (
+        <td role="cell" key={column.id} className="px-2 py-2" style={{width:column.getSize(),flexShrink:0,...getPinningStyles(column)}}>
           <Skeleton className="h-4 w-full" />
         </td>
       ))}

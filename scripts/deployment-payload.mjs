@@ -16,12 +16,18 @@ function walk(dir) {
     else add(path.relative(root, item))
   }
 }
+walk(path.join(root, "studio", "src"))
+for (const name of ["package.json", "package-lock.json", "tsconfig.json", "tsup.config.ts"]) add(`studio/${name}`)
 walk(path.join(root, "src"))
 walk(path.join(root, "showcase", "src"))
+walk(path.join(root, "showcase", "scripts"))
 walk(path.join(root, "brand"))
 walk(path.join(root, "showcase", "public", "brand"))
 add("showcase/public/brand.html")
+add("showcase/public/robots.txt")
+add("showcase/public/sitemap.xml")
 for (const file of [
+  "scripts/generate-api-docs.mjs",
   "package.json",
   "package-lock.json",
   "tsup.config.ts",

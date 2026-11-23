@@ -3,19 +3,43 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/playground", "destination": "/index.html" },
-    { "source": "/docs", "destination": "/index.html" }
+    {
+      "source": "/api-playground",
+      "destination": "/api-playground/index.html"
+    },
+    {
+      "source": "/blocks",
+      "destination": "/blocks/index.html"
+    },
+    {
+      "source": "/studio",
+      "destination": "/studio/index.html"
+    },
+    {
+      "source": "/playground",
+      "destination": "/playground/index.html"
+    },
+    {
+      "source": "/docs",
+      "destination": "/docs/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
-        { "key": "X-Frame-Options", "value": "DENY" },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=()"

@@ -1,3 +1,12 @@
+## 0.6.0
+
+- Opt-in multi-level grouping and aggregation, grouped saved views and leaf-record exports.
+- Custom React editors, Intl formatting, conditional rules, nested filter AST and pinned summaries.
+- Atomic batch operations, persisted conflict-aware undo/redo, query selection, TSV rectangle/fill helpers and live-update conflict reporting.
+- Abortable data sources and full-width virtual loading skeletons.
+- Separate React Studio package and editable sandboxed API code playground in the showcase.
+- See ADVANCED_GRID.md for backend responsibilities and remaining UI/test limits.
+
 # Changelog
 
 All notable changes to `@dynostack/react-grid` are documented here.
@@ -6,6 +15,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [Unreleased]
+
+- Keep expanded details virtualized, isolate scrolling, memoize unchanged rows and reuse number formatters.
+- Prepare large flat row models in bounded tasks with progress and stale-work cancellation; add a 50,000-row playground sample and overscan control.
+- Replace native row select/date editors with themed, keyboard-accessible popups.
+- Generate a searchable source API reference with all table props, callback types, options and feature guides.
+
+- Use matching slim scrollbars for table viewports and details panels.
+- Open new records as blank editable drafts with explicit save/cancel, failure retention and no duplicate insertion.
+- Redesign record details with a fixed action footer; configure Edit/Delete, width, layout and labels through viewSheet.
+
+- Prerender showcase routes and add unique metadata, canonical URLs, sitemap, robots.txt, social previews and brand/product structured data.
+- Improve Dynostack naming in the homepage.
+
+- Add synchronous/asynchronous column validators and accessible field errors.
+- Await cell and row save promises; retain drafts after failure and disable editors and duplicate submissions while saving.
+- Capture row drafts on input change and prevent Escape/Enter blur from submitting canceled or duplicate edits.
+
+## [0.5.2] - 2026-10-07
+
+- Remove the logo-download paragraph from the npm README.
+- Add Dynostack branding to the package description, keywords and README heading.
+- Preserve the published 0.5.1 runtime and type declarations.
 
 ## [0.5.1] - 2026-10-06
 

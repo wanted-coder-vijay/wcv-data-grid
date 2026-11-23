@@ -34,6 +34,10 @@ export {
 export { DataTablePagination } from "./data-table-pagination"
 export { DataTableToolbar } from "./data-table-toolbar"
 export { EditableCell } from "./editable-cell"
+export type { CustomCellEditorProps } from "./types"
+export * from "./grid-operations"
+export { useGridTransactions } from "./use-grid-transactions"
+export { useGridQuerySelection } from "./use-grid-query-selection"
 
 export {
   textFilterFn,
@@ -78,3 +82,6 @@ export type {
   RowAction,
   DataTableColumn,
 } from "./types"
+
+export { createDataTableState, type DataTableState } from "./table-state"
+export { type DataTableSavedView, type DataTableViewState, type DataTableSavedViewsConfig, type DataTableSavedViewLabels } from "./saved-views"

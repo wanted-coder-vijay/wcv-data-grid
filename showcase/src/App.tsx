@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react"
 import {
   motion,
   useMotionValue,
@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import {
   DataTable,
+  createDataTableState,
   themePresets,
   buildPreset,
   type DataTableFeatures,
@@ -38,10 +39,17 @@ import {
   type DataTableModedTheme,
 } from "@dynostack/react-grid"
 import { createData, createColumns, type Project } from "./data"
+import { ActionSoundToggle } from "./action-sounds"
+import { ApiReference } from "./ApiReference"
 import { BrandMark } from "./Brand"
 import { products } from "./products"
+import { applyPageSeo } from "./seo"
+const ApiPlayground = lazy(() => import("./ApiPlayground"))
+const StudioApp = lazy(() => import("./studio/StudioApp"))
+const BlocksGallery = lazy(() => import("./studio/BlocksGallery"))
 
 const featureNames: Record<keyof DataTableFeatures, string> = {
+  grouping: "Grouping & aggregation",
   search: "Global search",
   refresh: "Refresh data",
   columnVisibility: "Column visibility",
@@ -55,7 +63,7 @@ const featureNames: Record<keyof DataTableFeatures, string> = {
   pinning: "Column pinning",
 }
 const defaultFeatures = Object.fromEntries(
-  Object.keys(featureNames).map((key) => [key, true])
+  Object.keys(featureNames).map((key) => [key, key !== "grouping"])
 ) as Required<DataTableFeatures>
 type Config = {
   features: Required<DataTableFeatures>
@@ -74,7 +82,21 @@ type Config = {
   hue: number
   custom: boolean
   isolate: boolean
-  translated: boolean
+  validation: boolean
+  asyncSaving: boolean
+  failSaves: boolean
+  controlled: boolean
+  savedViews: boolean
+  keyboard: boolean
+  virtualRows: boolean
+  overscan: number
+  xlsx: boolean
+  xlsxFormats: boolean
+  xlsxSheets: boolean
+  detailsEdit: boolean
+  detailsDelete: boolean
+  detailsDensity: "compact" | "relaxed" | "comfy"
+  persistViews: boolean
 }
 const defaults: Config = {
   features: defaultFeatures,
@@ -93,13 +115,30 @@ const defaults: Config = {
   hue: 235,
   custom: false,
   isolate: true,
-  translated: false,
+  validation: false,
+  asyncSaving: false,
+  failSaves: false,
+  controlled: false,
+  savedViews: false,
+  keyboard: false,
+  virtualRows: false,
+  overscan: 8,
+  xlsx: false,
+  xlsxFormats: true,
+  xlsxSheets: false,
+  detailsEdit: true,
+  detailsDelete: true,
+  detailsDensity: "compact",
+  persistViews: false,
 }
 const repo = "https://github.com/wanted-coder-vijay/wcv-data-grid"
-function getRoute() {
-  return location.pathname.startsWith("/playground")
+function getRoute(pathname = location.pathname) {
+  if (pathname === "/api-playground" || pathname === "/api-playground/") return "api"
+  if (pathname === "/blocks" || pathname === "/blocks/") return "blocks"
+  if (pathname === "/studio" || pathname === "/studio/") return "studio"
+  return pathname === "/playground" || pathname === "/playground/"
     ? "playground"
-    : location.pathname.startsWith("/docs")
+    : pathname === "/docs" || pathname === "/docs/"
       ? "docs"
       : "home"
 }
@@ -169,9 +208,30 @@ function Demo({
   onSelection?: (rows: Project[]) => void
 }) {
   const [rows, setRows] = useState(() => createData(config.count))
+  const [datasetKey, setDatasetKey] = useState(`${config.count}:${resetKey}`)
   const [message, setMessage] = useState("")
-  useEffect(() => setRows(createData(config.count)), [config.count, resetKey])
-  const columns = useMemo(() => createColumns(config.editing), [config.editing])
+  const [tableState, setTableState] = useState(() => createDataTableState({ pagination: { pageIndex: 0, pageSize: small ? 5 : config.size } }))
+  useEffect(() => setTableState(createDataTableState({ pagination: { pageIndex: 0, pageSize: small ? 5 : config.size } })), [config.size, resetKey, small])
+  useEffect(() => {
+    const key = `${config.count}:${resetKey}`
+    if (key === datasetKey) return
+    let timer: ReturnType<typeof setTimeout>
+    const frame = requestAnimationFrame(() => { timer = setTimeout(() => { setRows(createData(config.count)); setDatasetKey(key) }, 0) })
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer) }
+  }, [config.count, resetKey, datasetKey])
+  const columns = useMemo(() => createColumns(config.editing).map(column => {
+    if (!config.validation || !("accessorKey" in column)) return column
+    const validate = column.accessorKey === "name"
+      ? (value: unknown) => String(value ?? "").trim() ? undefined : "Project name is required."
+      : column.accessorKey === "budget"
+        ? (value: unknown) => Number.isFinite(Number(value)) && Number(value) >= 0 ? undefined : "Budget must be zero or greater."
+        : undefined
+    return validate ? { ...column, meta: { ...column.meta, validate } } : column
+  }), [config.editing, config.validation])
+  async function beforeSave() {
+    if (config.asyncSaving) await new Promise(resolve => setTimeout(resolve, 1200))
+    if (config.failSaves) throw new Error("Simulated save failure. Turn off Fail saves, then retry without losing your draft.")
+  }
   const preset: DataTableModedTheme = config.custom
     ? buildPreset(config.hue)
     : themePresets[config.theme]
@@ -185,7 +245,22 @@ function Demo({
       <DataTable<Project>
         key={`${config.size}-${resetKey}`}
         data={rows}
-        isLoading={config.loading}
+        onRowsReorder={setRows}
+        enableKeyboardNavigation={config.keyboard}
+        virtualizeRows={config.virtualRows}
+        virtualOverscan={config.overscan}
+        onExportXlsx={config.xlsx ? async (table, fileName) => {
+          const { exportToXlsx } = await import("@dynostack/react-grid/xlsx")
+          await exportToXlsx(table, fileName, {
+            formats: config.xlsxFormats ? { budget: '$#,##0.00', date: 'yyyy-mm-dd' } : undefined,
+            additionalSheets: config.xlsxSheets ? [{ name: "Export info", headers: ["Setting", "Value"], rows: [["Loaded records", rows.length], ["Filtered records", table.getFilteredRowModel().rows.length], ["Selected records", table.getSelectedRowModel().rows.length]], }] : undefined,
+          })
+        } : undefined}
+        state={config.controlled ? tableState : undefined}
+        onStateChange={setTableState}
+        savedViews={config.savedViews ? { storageKey: config.persistViews ? "dynostack-playground-views-v1" : undefined } : undefined}
+        viewSheet={{ actions: { edit: config.detailsEdit && config.editing, delete: config.detailsDelete }, defaultDensity: config.detailsDensity, labels: { title: row => row.name || "Untitled project", description: () => "Project details and available actions." } }}
+        isLoading={config.loading || datasetKey !== `${config.count}:${resetKey}`}
         columns={columns}
         ariaLabel="Project workspace"
         theme={theme}
@@ -211,46 +286,27 @@ function Demo({
               ? ["view", "edit", "duplicate", "delete"]
               : ["view", "duplicate", "delete"]
         }
-        labels={
-          config.translated
-            ? {
-                search: "Rechercher…",
-                addRow: "Ajouter",
-                columns: "Colonnes",
-                export: "Exporter",
-                total: "Total",
-                noResults: "Aucun résultat.",
-              }
-            : undefined
-        }
         onRefresh={() => {
           setRows(createData(config.count))
           notify("Sample data refreshed")
         }}
-        onCellEdit={(row, columnId, value) => {
+        onCellEdit={async (row, columnId, value) => {
+          await beforeSave()
           setRows((prev) =>
             prev.map((r) => (r.id === row.id ? { ...r, [columnId]: value } : r))
           )
-          notify("Cell saved")
+
         }}
-        onRowSave={(row, draft) => {
+        onRowSave={async (row, draft) => {
+          await beforeSave()
           setRows((prev) =>
             prev.some((r) => r.id === row.id)
               ? prev.map((r) => (r.id === row.id ? { ...r, ...draft } : r))
               : [...prev, { ...row, ...draft }]
           )
-          notify("Row saved")
+
         }}
-        onAddRow={() => ({
-          id: `PRJ-${crypto.randomUUID().slice(0, 6)}`,
-          name: "New project",
-          owner: "You",
-          status: "Backlog",
-          priority: "Medium",
-          budget: 0,
-          date: "2026-10-20",
-          progress: 0,
-        })}
+        onAddRow={() => ({ id: `PRJ-${crypto.randomUUID().slice(0, 6)}` })}
         onDelete={(row) => {
           setRows((prev) => prev.filter((r) => r.id !== row.id))
           notify("Project deleted")
@@ -279,7 +335,7 @@ function Demo({
                 <div className="detail">
                   <strong>{row.name}</strong>
                   <p>
-                    Owned by {row.owner}. Budget: ${row.budget.toLocaleString()}
+                    Owned by {row.owner}. Budget: ${(row.budget ?? 0).toLocaleString()}
                     . Due {row.date}. Open the row menu to view details or edit
                     the project.
                   </p>
@@ -289,6 +345,16 @@ function Demo({
         }
         exportFileName="dynostack-projects"
       />
+      {!small && (config.controlled || config.savedViews || config.validation || config.asyncSaving || config.failSaves || config.keyboard || config.virtualRows || config.xlsx) && <div className="playground-lab">
+        <p><strong>Try it:</strong> double-click a project name and clear it to test validation. Enable Fail saves, edit a value, then disable Fail saves and press Enter to retry. Row edits use Save row.</p>
+        <p>Change search, sorting, visibility or widths, enter a view name and choose Save view. Change the table again, then Restore. Reset view restores the initial layout; Clear saved views removes stored presets.</p>
+        {config.keyboard && <p>Keyboard: focus the first cell, use arrows or Tab/Shift+Tab to navigate, Enter/F2 to edit and Escape to cancel. Enter on a checkbox or action cell focuses its control.</p>}
+        {config.virtualRows && <p>Virtual rows: disable Pagination and choose 10,000 sample rows to test scrolling. Expanded details are virtualized too; editing rows stay mounted. Choose 50,000 rows to test the largest sample. Large flat row models are prepared in short tasks while controls remain available.</p>}
+        {config.xlsx && <p>Export → XLSX workbook creates a native workbook for selected rows, or all filtered loaded rows. Formatting and an information sheet are configurable below.</p>}
+        <details><summary>Inspect table state ({config.controlled ? "application controlled" : "internally managed"})</summary><pre data-testid="table-state">{JSON.stringify(tableState, null, 2)}</pre></details>
+        {config.controlled && <button className="secondary-button" onClick={() => setTableState(createDataTableState({ pagination: { pageIndex: 0, pageSize: config.size } }))}>Reset controlled state</button>}
+        {config.persistViews && <p>Only view configuration is stored in this browser. Clear saved views removes it; resetting the playground keeps saved views.</p>}
+      </div>}
       {message && (
         <div className="toast" role="status">
           <Check size={15} />
@@ -445,9 +511,9 @@ function Home({
           </div>
           <h1>Dynostack.</h1>
           <p>
-            A growing toolkit for modern interfaces.
-            <br className="desktop" /> Start with Grid. More tools will join the
-            stack.
+            Open-source tools for modern React interfaces.
+            <br className="desktop" /> Start with Dynostack React Grid: editable
+            data tables with powerful filters and themes.
           </p>
           <div className="hero-actions">
             <a
@@ -493,7 +559,7 @@ function Home({
             <article className="product-card" key={product.id}>
               <div className="product-heading">
                 <BrandMark grid size={46} />
-                <span className="product-status">Available now</span>
+                <span className="product-status">{product.status === "available" ? "Available now" : "Local preview"}</span>
               </div>
               <h3>
                 <span>Dynostack</span> {product.name}
@@ -515,10 +581,10 @@ function Home({
             <BrandMark size={46} />
             <h3>More in the stack.</h3>
             <p>
-              Grid is our first product. This is where future Dynostack tools
-              will join the family.
+              Forms, schedules, dashboards, workflows, plans, documents and charts
+              now have working local previews in Studio.
             </p>
-            <span className="future-note">Space for what comes next</span>
+            <a className="future-note" href="/studio" onClick={e => { e.preventDefault(); go('/studio') }}>Explore Studio</a>
           </article>
         </div>
       </section>
@@ -633,7 +699,26 @@ function Home({
 }
 
 function configCode(c: Config) {
-  return `import { DataTable, ${c.custom ? "buildPreset" : "themePresets"} } from '@dynostack/react-grid'\n\n// Define rows and columns as shown in the Quick start docs.\nconst preset = ${c.custom ? `buildPreset(${c.hue})` : `themePresets.${c.theme}`}\n\n<DataTable\n  data={rows}\n  columns={columns}\n  isLoading={${c.loading}}\n  theme={preset}\n  className="${c.dark ? "dark" : "light"}"\n  density="${c.density}"\n  isolate={${c.isolate}}\n  enableSelection={${c.selection}}\n  striped={${c.striped}}\n  stickyHeader={${c.sticky}}\n  maxHeight="520px"\n  ariaLabel="Project workspace"\n  initialPageSize={${c.size}}\n  pageSizeOptions={[5, 10, 20, 50, 100]}\n  features={${JSON.stringify(c.features, null, 2).replace(/\n/g, "\n  ")}}\n  rowActions={${JSON.stringify(c.actions ? (c.editing ? ["view", "edit", "duplicate", "delete"] : ["view", "duplicate", "delete"]) : [])}}${c.translated ? '\n  labels={{ search: "Rechercher…", addRow: "Ajouter", columns: "Colonnes", export: "Exporter", total: "Total", noResults: "Aucun résultat." }}' : ""}${c.expansion ? "\n  renderSubRow={(row) => <p>{row.name}</p>}" : ""}\n  onSelectionChange={setSelectedRows}${c.editing ? "\n  onCellEdit={(row, key, value) => setRows(previous => previous.map(item => item.id === row.id ? { ...item, [key]: value } : item))}\n  onRowSave={(row, draft) => setRows(previous => previous.some(item => item.id === row.id) ? previous.map(item => item.id === row.id ? { ...item, ...draft } : item) : [...previous, { ...row, ...draft }])}" : ""}\n  onDelete={(row) => setRows(previous => previous.filter(item => item.id !== row.id))}\n  onBulkDelete={(selected) => setRows(previous => previous.filter(item => !selected.some(row => row.id === item.id)))}\n  onRowAction={(action, row) => {\n    if (action === 'duplicate') setRows(previous => [...previous, { ...row, id: crypto.randomUUID() }])\n  }}${c.features.addRow ? '\n  onAddRow={() => ({ id: crypto.randomUUID(), name: "New project" })}' : ""}${c.features.refresh ? "\n  onRefresh={reloadRows}" : ""}\n/>\n\n// Editing is configured per column:\n// meta: { editor: 'text', isEditable: ${c.editing} }`
+  let code = `import { DataTable, ${c.custom ? "buildPreset" : "themePresets"} } from '@dynostack/react-grid'\n\n// Define rows and columns as shown in the Quick start docs.\nconst preset = ${c.custom ? `buildPreset(${c.hue})` : `themePresets.${c.theme}`}\n\n<DataTable\n  data={rows}\n  columns={columns}\n  isLoading={${c.loading}}\n  theme={preset}\n  className="${c.dark ? "dark" : "light"}"\n  density="${c.density}"\n  isolate={${c.isolate}}\n  enableSelection={${c.selection}}\n  striped={${c.striped}}\n  stickyHeader={${c.sticky}}\n  maxHeight="520px"\n  ariaLabel="Project workspace"\n  initialPageSize={${c.size}}\n  pageSizeOptions={[5, 10, 20, 50, 100]}\n  features={${JSON.stringify(c.features, null, 2).replace(/\n/g, "\n  ")}}\n  rowActions={${JSON.stringify(c.actions ? (c.editing ? ["view", "edit", "duplicate", "delete"] : ["view", "duplicate", "delete"]) : [])}}${c.expansion ? "\n  renderSubRow={(row) => <p>{row.name}</p>}" : ""}\n  onSelectionChange={setSelectedRows}${c.editing ? "\n  onCellEdit={(row, key, value) => setRows(previous => previous.map(item => item.id === row.id ? { ...item, [key]: value } : item))}\n  onRowSave={(row, draft) => setRows(previous => previous.some(item => item.id === row.id) ? previous.map(item => item.id === row.id ? { ...item, ...draft } : item) : [...previous, { ...row, ...draft }])}" : ""}\n  onDelete={(row) => setRows(previous => previous.filter(item => item.id !== row.id))}\n  onBulkDelete={(selected) => setRows(previous => previous.filter(item => !selected.some(row => row.id === item.id)))}\n  onRowAction={(action, row) => {\n    if (action === 'duplicate') setRows(previous => [...previous, { ...row, id: crypto.randomUUID() }])\n  }}${c.features.addRow ? '\n  onAddRow={() => ({ id: crypto.randomUUID(), name: "" })}' : ""}${c.features.refresh ? "\n  onRefresh={reloadRows}" : ""}\n/>\n\n// Editing is configured per column:\n// meta: { editor: 'text', isEditable: ${c.editing} }`
+  code = code.replace("  data={rows}", "  data={rows}\n  enableKeyboardNavigation={" + c.keyboard + "}\n  virtualizeRows={" + c.virtualRows + "}")
+  code = code.replace("  virtualizeRows={" + c.virtualRows + "}", "  virtualizeRows={" + c.virtualRows + "}\n  virtualOverscan={" + c.overscan + "}")
+  if (c.xlsx) code = code.replace("  data={rows}", "  data={rows}\n  onExportXlsx={async (table, fileName) => {\n    const { exportToXlsx } = await import('@dynostack/react-grid/xlsx')\n    await exportToXlsx(table, fileName, " + JSON.stringify({ formats: c.xlsxFormats ? { budget: '$#,##0.00' } : undefined, additionalSheets: c.xlsxSheets ? [{ name: 'Export info', headers: ['Setting', 'Value'], rows: [['Scope', 'Selected or filtered loaded records']] }] : undefined }) + ")\n  }}")
+  if (c.controlled) {
+    code = code.replace("DataTable, ", "DataTable, createDataTableState, ")
+    code = code.replace("// Define rows", "import { useState } from 'react'\n\n// Inside your component:\nconst [tableState, setTableState] = useState(() => createDataTableState({ pagination: { pageIndex: 0, pageSize: " + c.size + " } }))\n\n// Define rows")
+    code = code.replace("  data={rows}", "  data={rows}\n  state={tableState}\n  onStateChange={setTableState}")
+  }
+  code = code.replace("  data={rows}", "  data={rows}\n  viewSheet={" + JSON.stringify({ actions: { edit: c.detailsEdit && c.editing, delete: c.detailsDelete }, defaultDensity: c.detailsDensity }) + "}")
+  if (c.savedViews) code = code.replace("  data={rows}", "  data={rows}\n  savedViews={{" + (c.persistViews ? ' storageKey: "my-project-views-v1" ' : '') + "}}")
+  if (c.asyncSaving || c.failSaves) {
+    code = code.replace("onCellEdit={(row, key, value) => setRows(", "onCellEdit={async (row, key, value) => { await saveToBackend(); setRows(")
+      .replace("[key]: value } : item))}", "[key]: value } : item)); }}")
+      .replace("onRowSave={(row, draft) => setRows(", "onRowSave={async (row, draft) => { await saveToBackend(); setRows(")
+      .replace("[...previous, { ...row, ...draft }])}", "[...previous, { ...row, ...draft }]); }}")
+    code += '\n\n// Demo adapter; replace with your backend save request.\nasync function saveToBackend() {\n' + (c.asyncSaving ? '  await new Promise(resolve => setTimeout(resolve, 1200))\n' : '') + (c.failSaves ? '  throw new Error("Simulated failure; disable this to retry")\n' : '') + '}'
+  }
+  if (c.validation) code += '\n\n// Add to the name column meta:\n// validate: value => String(value ?? "").trim() ? undefined : "Project name is required."\n// Add to the budget column meta:\n// validate: value => Number.isFinite(Number(value)) && Number(value) >= 0 ? undefined : "Budget must be zero or greater."'
+  return code
 }
 function Playground({ dark }: { dark: boolean }) {
   useEffect(() => {
@@ -661,13 +746,15 @@ function Playground({ dark }: { dark: boolean }) {
         "dark",
         "custom",
         "isolate",
-        "translated",
+        "detailsEdit", "detailsDelete", "validation", "asyncSaving", "failSaves", "controlled", "savedViews", "persistViews", "keyboard", "virtualRows", "xlsx", "xlsxFormats", "xlsxSheets",
       ] as const)
         if (typeof parsed[key] === "boolean") next[key] = parsed[key]
       if (["compact", "default", "comfortable"].includes(parsed.density))
         next.density = parsed.density
+      if (["compact", "relaxed", "comfy"].includes(parsed.detailsDensity)) next.detailsDensity = parsed.detailsDensity
       if (Object.hasOwn(themePresets, parsed.theme)) next.theme = parsed.theme
-      if ([48, 250, 1000].includes(parsed.count)) next.count = parsed.count
+      if ([48, 250, 1000, 10000, 50000].includes(parsed.count)) next.count = parsed.count
+      if ([4, 8, 16, 32].includes(parsed.overscan)) next.overscan = parsed.overscan
       if ([5, 10, 20, 50, 100].includes(parsed.size)) next.size = parsed.size
       if (Number.isFinite(parsed.hue))
         next.hue = Math.max(0, Math.min(360, parsed.hue))
@@ -849,23 +936,50 @@ function Playground({ dark }: { dark: boolean }) {
                 ["loading", "Loading state"],
                 ["actions", "Row action menu"],
                 ["expansion", "Expandable details"],
-                ["translated", "French toolbar labels"],
+                ["detailsEdit", "Details panel: Edit action"],
+                ["detailsDelete", "Details panel: Delete action"],
+                ["validation", "Required name & nonnegative budget"],
+                ["asyncSaving", "Simulate 1.2-second saves"],
+                ["failSaves", "Fail saves (drafts retained)"],
+                ["controlled", "Application controlled state"],
+                ["savedViews", "Named saved views"],
+                ["persistViews", "Persist views in this browser"],
+                ["keyboard", "Keyboard cell navigation"],
+                ["virtualRows", "Virtualize loaded rows"],
+                ["xlsx", "Native XLSX export"],
+                ["xlsxFormats", "XLSX numeric formatting"],
+                ["xlsxSheets", "XLSX extra information sheet"],
               ] as const
             ).map(([key, label]) => (
               <Switch
                 key={key}
                 label={label}
                 value={c[key]}
-                onChange={() => update(key, !c[key])}
+                onChange={() => {
+                  if (key === "virtualRows" && !c.virtualRows) setC(previous => ({ ...previous, virtualRows: true, features: { ...previous.features, pagination: false } }))
+                  else if (key === "virtualRows" && c.virtualRows && c.count >= 10000) setC(previous => ({ ...previous, virtualRows: false, features: { ...previous.features, pagination: true } }))
+                  else update(key, !c[key])
+                }}
               />
             ))}
             <label className="field">
-              Sample rows
+              Virtual row overscan
+              <select aria-label="Virtual row overscan" value={c.overscan} onChange={e => update("overscan", Number(e.target.value))}>{[4, 8, 16, 32].map(n => <option key={n}>{n}</option>)}</select>
+            </label>
+            <label className="field">
+              Details layout
+              <select aria-label="Details layout" value={c.detailsDensity} onChange={e => update("detailsDensity", e.target.value as Config["detailsDensity"])}>
+                {["compact", "relaxed", "comfy"].map(value => <option key={value}>{value}</option>)}
+              </select>
+            </label>
+            <label className="field">
+              Sample rows (large samples enable virtualization)
               <select
+                aria-label="Sample rows"
                 value={c.count}
-                onChange={(e) => update("count", Number(e.target.value))}
+                onChange={(e) => { const count = Number(e.target.value); setC(previous => ({ ...previous, count, virtualRows: count >= 10000 || previous.virtualRows, features: count >= 10000 ? { ...previous.features, pagination: false } : previous.features })) }}
               >
-                {[48, 250, 1000].map((n) => (
+                {[48, 250, 1000, 10000, 50000].map((n) => (
                   <option key={n}>{n}</option>
                 ))}
               </select>
@@ -873,6 +987,7 @@ function Playground({ dark }: { dark: boolean }) {
             <label className="field">
               Initial page size
               <select
+                aria-label="Initial page size"
                 value={c.size}
                 onChange={(e) => update("size", Number(e.target.value))}
               >
@@ -910,7 +1025,7 @@ function Playground({ dark }: { dark: boolean }) {
             <div className="preview-intro">
               <div>
                 <h2>Project workspace</h2>
-                <p>Sample data. All changes stay in this browser session.</p>
+                <p>Sample data. Saves are simulated; view persistence is optional.</p>
               </div>
               <span className="preview-badge">
                 <Sparkles size={14} /> Your configuration
@@ -954,6 +1069,41 @@ function Playground({ dark }: { dark: boolean }) {
 }
 
 const quickStart = `import { useState } from 'react'\nimport { DataTable, type DataTableColumn } from '@dynostack/react-grid'\n\ntype Project = { id: string; name: string; budget: number }\nconst columns: DataTableColumn<Project>[] = [\n  { accessorKey: 'name', header: 'Project',\n    meta: { editor: 'text', isEditable: true } },\n  { accessorKey: 'budget', header: 'Budget',\n    meta: { editor: 'currency', filterType: 'number' } },\n]\n\nexport default function Projects() {\n  const [rows, setRows] = useState<Project[]>([\n    { id: '1', name: 'Website redesign', budget: 12000 },\n  ])\n  return <DataTable data={rows} columns={columns}\n    rowActions={['view', 'edit', 'delete']}\n    onCellEdit={(row, key, value) => setRows(previous =>\n      previous.map(item => item.id === row.id\n        ? { ...item, [key]: value } : item))}\n    onRowSave={(row, draft) => setRows(previous =>\n      previous.some(item => item.id === row.id)\n        ? previous.map(item => item.id === row.id ? { ...item, ...draft } : item)\n        : [...previous, { ...row, ...draft }])}\n    onDelete={(row) => setRows(previous => previous.filter(item => item.id !== row.id))}\n    onAddRow={() => ({ id: crypto.randomUUID(), name: '', budget: 0 })}\n  />\n}`
+const reliableEditingCode = `const columns = [{ accessorKey: 'name', header: 'Name',
+  meta: { editor: 'text', isEditable: true,
+    validate: value => String(value ?? '').trim() ? undefined : 'Name is required.' } }]
+// Return the request promise. Update rows only after it resolves.
+<DataTable data={rows} columns={columns}
+  onCellEdit={async (row, columnId, value) => {
+    const saved = await api.update(row.id, { [columnId]: value })
+    setRows(previous => previous.map(item => item.id === row.id ? saved : item))
+  }}
+  onRowSave={async (row, draft) => {
+    const saved = await api.update(row.id, draft)
+    setRows(previous => previous.map(item => item.id === row.id ? saved : item))
+  }} />`
+const controlledStateCode = `import { useState } from 'react'
+import { DataTable, createDataTableState } from '@dynostack/react-grid'
+// Inside your component:
+const [state, setState] = useState(() => createDataTableState({
+  pagination: { pageIndex: 0, pageSize: 20 },
+  columnVisibility: { internalNotes: false },
+}))
+<DataTable data={rows} columns={columns} state={state} onStateChange={setState} />
+// Partial control:
+<DataTable data={rows} columns={columns}
+  state={{ sorting: state.sorting }}
+  onStateChange={next => setState(previous => ({ ...previous, sorting: next.sorting }))} />`
+const savedViewsCode = `import { useState } from 'react'
+import { DataTable, type DataTableSavedView } from '@dynostack/react-grid'
+
+<DataTable data={rows} columns={columns}
+  savedViews={{ storageKey: 'invoices-views-v1' }} />
+// Application-managed views (e.g. backend persistence):
+const [views, setViews] = useState<DataTableSavedView[]>([])
+<DataTable data={rows} columns={columns}
+  savedViews={{ views, onViewsChange: setViews,
+    labels: { save: 'Save preset', reset: 'Default layout' } }} />`
 const docsSections = [
   "Installation",
   "Quick start",
@@ -965,6 +1115,13 @@ const docsSections = [
   "Export & security",
   "API reference",
   "Downloads",
+  "Reliable editing",
+  "Controlled state",
+  "Saved views",
+  "Feature roadmap",
+  "Keyboard & virtualization",
+  "Native XLSX",
+  "Complete API reference",
 ]
 function Docs() {
   const [active, setActive] = useState("Installation")
@@ -1223,7 +1380,7 @@ function Docs() {
           </div>
           <p>
             See the{" "}
-            <a href={`${repo}#api-reference`}>complete typed API reference</a>{" "}
+            <a href="#doc-16">complete typed API reference</a>{" "}
             for view sheets, delete confirmation, pagination, filters, and
             exported helpers.
           </p>
@@ -1261,10 +1418,53 @@ function Docs() {
           </div>
           <div className="notice">
             The playground runs the source package in this repository. Install
-            the latest npm version to use the same layout controls and export
-            protections.
+            the published package for released features. New editing, controlled
+            state and saved-view APIs are currently available in this source build.
           </div>
         </section>
+        <section id="doc-10"><h2>Reliable editing</h2>
+          <p>Set column metadata validate to return an error string or undefined, synchronously or asynchronously. Return a promise from onCellEdit or onRowSave to track pending saves. Validation blocks persistence; a rejected save keeps the draft and displays an error. Press Enter or Save row to retry; Escape or Cancel edit discards an unsaved draft. Pending saves lock editing controls.</p>
+          <Code text={reliableEditingCode} />
+          <p>In the playground enable required-name validation, simulated saves and Fail saves. Clear a name, then fix it; fail a save, switch failures off and retry. Your callback owns persistence and updates data only after success.</p>
+        </section>
+        <section id="doc-11"><h2>Controlled state</h2>
+          <p>Use state and onStateChange to manage sorting, column filters, global search, pagination, selection, order, widths, visibility, pinning and expansion. The callback receives the complete next snapshot. Supply only selected slices for partial control; other slices remain internal. A supplied slice without a handler is read-only. initialState applies once and overrides legacy initial props. state.globalFilter takes precedence over the legacy globalFilter prop.</p>
+          <Code text={controlledStateCode} />
+          <p>Use stable row and column IDs. Control values are not persisted automatically. In server mode the existing dataSource receives the controlled pagination, filters and sorting. Select Application controlled state in the playground, inspect the state, change search and columns, and use Reset controlled state.</p>
+        </section>
+        <section id="doc-12"><h2>Saved views</h2>
+          <p>A named saved view is a reusable table setup, such as “Overdue projects”: save a due-date filter, sorting and visible columns, then restore that setup later. It does not save a copy of your records.</p>
+          <p>Pass savedViews to enable naming, saving, restoring, renaming, deleting and resetting table configurations. Views capture search, column filters, sorting, visibility, pinning, widths and order. Restore resets the page index while retaining page size and selection. Rows, edits, selection and expanded rows are never saved.</p>
+          <Code text={savedViewsCode} />
+          <p>New records: onAddRow returns a blank draft with a unique id. Editable fields stay empty; Save row validates and awaits onRowSave, while Cancel discards the draft. Add clears search, filters and sorting and opens the first page so the draft is visible. Your onRowSave callback must insert the new record into application data after saving.</p>
+          <p>Record details: viewSheet.actions.edit and viewSheet.actions.delete control the footer actions. Edit uses onRowSave and returns to inline row editing; Delete uses onDelete and the existing confirmation dialog. Configure width, side, defaultDensity, hideDensityTabs, fields, renderField and labels to customize the panel.</p>
+          <Code text={`<DataTable data={rows} columns={columns}
+  onAddRow={() => ({ id: crypto.randomUUID() })}
+  onRowSave={saveAndUpdateRows} onDelete={deleteRow}
+  viewSheet={{ actions: { edit: true, delete: false },
+    width: "min(36rem, 100vw)", defaultDensity: "compact",
+    labels: { title: row => row.name, edit: "Edit project" } }} />`} />
+          <p>storageKey opts into localStorage. Use a distinct, versioned key for each dataset and column schema. Views stay local to that browser; use views and onViewsChange for application-managed presets (omit storageKey). Stored filters may contain sensitive search terms. Invalid or unavailable storage reports an error and leaves the table usable. Clear saved views removes the stored key. Up to 50 views, with names of up to 80 characters, are supported. Controls are disabled while editing or saving to protect drafts.</p>
+          <p>In the playground enable Named saved views, optionally enable persistence, configure the table and Save view. Change search and Restore; Rename, Delete view, Reset view and Clear saved views each have separate controls.</p>
+        </section>
+        <section id="doc-14"><h2>Keyboard &amp; virtualization</h2>
+          <Code text={'<DataTable data={rows} columns={columns}\n  enableKeyboardNavigation virtualizeRows maxHeight="520px"\n  features={{ pagination: false }} />'} />
+          <p>Keyboard navigation is opt-in. One cell is in the Tab sequence; arrows move between visible cells, Home/End move to row edges, Tab/Shift+Tab move across rows, and Tab at table boundaries leaves the grid. Enter or F2 starts an editable cell; Escape cancels and returns focus. Tab from a cell editor saves before moving; failed validation retains the draft and focus. Themed select editors provide arrow-key option navigation. The calendar supports arrow keys, Home/End and PageUp/PageDown, plus month/year selection, Today and Clear date. Row-edit inputs keep their native Tab order and use explicit Save/Cancel controls. Row/column positions are announced.</p>
+          <p>Virtual rows use TanStack Virtual with dynamic measurement and overscan. Set maxHeight; it defaults to 480px. Pagination still limits the row model, so disable it to scroll all loaded records. Editing rows stay mounted to retain drafts. Expanded details are independently measured virtual items; opening one never disables virtualization. Scrolling updates only the virtual body. Flat datasets of at least 2,000 records are prepared in tasks capped at 256 new row objects and approximately 6ms; unchanged records with stable identity are reused, with an accessible progress status and cancellation when data changes. Nested getSubRows models use the standard synchronous TanStack core model. Server mode virtualizes only loaded rows, not an unrequested server dataset. Export covers filtered loaded records, not only rendered rows.</p>
+          <p>In the playground enable Keyboard cell navigation and Virtualize loaded rows, choose 10,000 or 50,000 rows, scroll and inspect the rendered rows. Toggle pagination separately to compare. Use stable row IDs.</p>
+        </section>
+        <section id="doc-15"><h2>Native XLSX</h2>
+          <p>Install the optional exceljs peer dependency and import the separate /xlsx entry only when needed. The core grid does not import ExcelJS. The existing HTML .xls helper remains for compatibility; onExportXlsx replaces the toolbar option with XLSX workbook.</p>
+          <Code text={'npm install exceljs\n\n<DataTable data={rows} columns={columns}\n  onExportXlsx={async (table, fileName) => {\n    const { exportToXlsx } = await import("@dynostack/react-grid/xlsx")\n    await exportToXlsx(table, fileName, {\n      sheetName: "Projects", formats: { budget: "$#,##0.00" },\n      additionalSheets: [{ name: "Info", headers: ["Scope"], rows: [["Loaded rows"]] }]\n    })\n  }} />'} />
+          <p>Numbers, booleans and Date objects retain their types. Text remains literal and is never interpreted as a formula. ISO date strings remain text; supply Date values for native date cells. Headers are bold, the header row is frozen, and optional column formats use Excel format codes. createXlsxWorkbook accepts multiple named sheets and returns bytes for custom download or server storage. Exports use selected loaded rows, or filtered loaded rows if nothing is selected, with visible exportable columns. Workbook creation shows a loading status and errors allow retry.</p>
+          <p>The showcase enables numeric formatting and an optional information sheet. ExcelJS adds a substantial lazy-loaded chunk. Its legacy uuid dependency is overridden to ^11.1.1 in this repository after verifying ExcelJS only uses v4; consumers should audit their optional dependency tree and apply the same override when appropriate.</p>
+        </section>
+        <section id="doc-13"><h2>Feature roadmap</h2>
+          <p>Grid 0.6.0 is published on npm. It includes validated async editing, controlled state, saved views, keyboard navigation, row virtualization and optional native XLSX.</p>
+          <p>New in 0.6.0: multi-level grouping and aggregation, custom editors and formatting, nested filter expressions, locale and RTL options, conditional formatting, summary rows, transactions with undo/redo, query selection and live-update conflict helpers. Try grouping in the Playground and API adapters, bulk edits, paste and fill in the API lab.</p>
+          <p>Server grouping, query authorization and atomic persistence remain application responsibilities. Drag-selected ranges, native clipboard shortcuts, a visual nested-filter builder and full cross-browser visual regression coverage remain pending.</p>
+        </section>
+        <section id="doc-16"><h2>Complete API reference</h2><ApiReference /></section>
       </article>
       <aside className="on-this-page">
         <span>On this page</span>
@@ -1283,10 +1483,13 @@ function Docs() {
   )
 }
 
-export default function App() {
+export default function App({ initialPath, prerender = false, studioContent, blocksContent, apiContent }: { initialPath?: string; prerender?: boolean; studioContent?: ReactNode; blocksContent?: ReactNode; apiContent?: ReactNode } = {}) {
   const reduced = useReducedMotion()
-  const [animated, setAnimated] = useState(true)
-  const [route, setRoute] = useState(getRoute)
+  const [animated, setAnimated] = useState(!prerender)
+  const [route, setRoute] = useState(() => getRoute(initialPath))
+  useEffect(() => {
+    applyPageSeo(route === "api" ? "/api-playground" : route === "blocks" ? "/blocks" : route === "home" ? "/" : route === "studio" ? "/studio" : route === "docs" ? "/docs" : "/playground")
+  }, [route])
   const [dark, setDark] = useState(() => {
     try {
       return localStorage.getItem("dynostack-mode") !== "light"
@@ -1337,7 +1540,7 @@ export default function App() {
               <span className="brand-divider" />{" "}
               <span className="brand-product">
                 <BrandMark grid size={18} />
-                Grid
+                {route === "blocks" ? "Blocks" : route === "studio" ? "Studio" : "Grid"}
               </span>
             </>
           )}
@@ -1347,6 +1550,9 @@ export default function App() {
             ["/", "Products", "home"],
             ["/playground", "Playground", "playground"],
             ["/docs", "Documentation", "docs"],
+            ["/studio", "Studio", "studio"],
+            ["/blocks", "Blocks", "blocks"],
+            ["/api-playground", "API lab", "api"],
           ].map(([url, title, key]) => (
             <a
               key={key}
@@ -1363,6 +1569,7 @@ export default function App() {
           ))}
         </nav>
         <div className="header-tools">
+          <ActionSoundToggle />
           <button
             className="mode-toggle"
             aria-label={animated ? "Pause animations" : "Enable animations"}
@@ -1396,7 +1603,13 @@ export default function App() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
-        {route === "home" ? (
+        {route === "api" ? (
+          apiContent ?? <Suspense fallback={<main style={{padding:40}} role="status">Loading API playground...</main>}><ApiPlayground /></Suspense>
+        ) : route === "blocks" ? (
+          blocksContent ?? <Suspense fallback={<main style={{padding:40}} role="status">Loading blocks...</main>}><BlocksGallery /></Suspense>
+        ) : route === "studio" ? (
+          studioContent ?? <Suspense fallback={<main style={{ padding: 40 }} role="status">Loading Studio…</main>}><StudioApp /></Suspense>
+        ) : route === "home" ? (
           <Home go={go} dark={dark} animated={animated} />
         ) : route === "playground" ? (
           <Playground dark={dark} />
@@ -1417,7 +1630,7 @@ export default function App() {
         </a>
         <span>Built for builders. Apache 2.0 licensed.</span>
         <a href="https://www.npmjs.com/package/@dynostack/react-grid">
-          npm <ArrowUpRight size={13} />
+          Dynostack React Grid on npm <ArrowUpRight size={13} />
         </a>
         <a href={repo}>
           GitHub <ArrowUpRight size={13} />

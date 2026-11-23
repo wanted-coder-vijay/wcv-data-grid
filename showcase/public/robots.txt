@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://dynostack-react-grid.vercel.app/sitemap.xml

@@ -272,3 +272,29 @@
     --ring: oklch(0.439 0 0);
   }
 }
+
+/* Shared slim scrollbars for table viewports and record details. */
+[data-grid-scrollbar] { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+[data-grid-scrollbar]::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-grid-scrollbar]::-webkit-scrollbar-track { background: transparent; }
+[data-grid-scrollbar]::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+[data-grid-scrollbar]::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+[data-grid-scrollbar]::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+.dyno-row-checkbox { appearance: none; width: 14px; height: 14px; flex-shrink: 0; border: 1px solid var(--input); border-radius: 4px; background: transparent; display: grid; place-content: center; outline: none; cursor: pointer; }
+.dyno-row-checkbox::before { content: ""; width: 7px; height: 4px; border-left: 2px solid var(--primary-foreground); border-bottom: 2px solid var(--primary-foreground); transform: translateY(-1px) rotate(-45deg) scale(0); }
+.dyno-row-checkbox:checked { background: var(--primary); border-color: var(--primary); }
+.dyno-row-checkbox:checked::before { transform: translateY(-1px) rotate(-45deg) scale(1); }
+.dyno-row-checkbox:focus-visible { border-color: var(--primary); }
+
+.dyno-group-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--background); font-size:12px; }
+.dyno-group-controls button { padding:4px 8px; border:1px solid var(--border); border-radius:5px; }
+.dyno-group-controls button[aria-pressed=true] { background:var(--muted); }
+[data-virtual-table]>tbody>tr:not([data-index]) { display:flex; width:100%; }
+[data-virtual-table]>tbody>tr:not([data-index]):not([data-loading-row])>td { width:100%; }
+[data-loading-row] .animate-pulse { width:100%; }
+
+.grid-row-grip { display: grid; place-items: center; width: 28px; height: 28px; color: var(--muted-foreground); touch-action: none; cursor: grab; border-radius: 6px; }
+.grid-row-grip:hover, .grid-row-grip:focus-visible { color: var(--foreground); background: var(--muted); }
+.grid-row-grip:active { cursor: grabbing; }
+tr[data-row-lifted] { position: relative; z-index: 4; background: var(--card, Canvas); box-shadow: 0 12px 24px -6px #0005, 0 0 0 1px #8885; }

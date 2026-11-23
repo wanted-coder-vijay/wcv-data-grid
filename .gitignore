@@ -11,3 +11,5 @@ showcase/dist
 .env
 .env.*
 !.env.example
+
+showcase/.prerender
