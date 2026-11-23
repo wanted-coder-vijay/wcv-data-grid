@@ -68,11 +68,14 @@ export function RowGrip<T>({ row, table, commit }: {
       let top = boxes[0].top
       let groupOffset = 0
       const beforeLead = p.group.slice(0, p.group.indexOf(row)).reduce((h,r) => h + boxes[indices.get(r)!].height, 0)
+      const groupHeight = p.group.reduce((height, r) => height + boxes[indices.get(r)!].height, 0)
+      const groupTop = Math.max(boxes[0].top, Math.min(boxes[boxes.length - 1].bottom - groupHeight,
+        boxes[lead].top + dy - beforeLead))
       for (const r of p.order(slot)) {
         const i = indices.get(r)!
         const node = nodes[i]
         const lifted = p.moving.has(r)
-        const offset = lifted ? boxes[lead].top + dy - beforeLead + groupOffset - boxes[i].top : top - boxes[i].top
+        const offset = lifted ? groupTop + groupOffset - boxes[i].top : top - boxes[i].top
         node.style.transition = lifted || reduced ? "none" : "transform 380ms cubic-bezier(.19,1.24,.34,1)"
         node.style.transform = `translateY(${offset}px)${lifted && !reduced ? " scale(1.03)" : ""}`
         if (lifted) {

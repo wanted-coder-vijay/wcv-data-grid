@@ -297,4 +297,4 @@
 .grid-row-grip { display: grid; place-items: center; width: 28px; height: 28px; color: var(--muted-foreground); touch-action: none; cursor: grab; border-radius: 6px; }
 .grid-row-grip:hover, .grid-row-grip:focus-visible { color: var(--foreground); background: var(--muted); }
 .grid-row-grip:active { cursor: grabbing; }
-tr[data-row-lifted] { position: relative; z-index: 4; background: var(--card, Canvas); box-shadow: 0 12px 24px -6px #0005, 0 0 0 1px #8885; }
+tr[data-row-lifted] { transform-origin: left center; position: relative; z-index: 4; background: var(--card, Canvas); box-shadow: 0 12px 24px -6px #0005, 0 0 0 1px #8885; }
