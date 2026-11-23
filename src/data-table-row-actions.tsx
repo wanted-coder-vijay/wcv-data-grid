@@ -167,13 +167,14 @@ export function DataTableRowActions<TData>({
             {actions.map((a) => (
               <RowActionButton
                 key={a}
+                icon={builtinIcons[a]}
                 danger={a === "delete"}
                 onClick={() => {
                   setOpen(false)
                   onAction?.(a, row)
                 }}
               >
-                {builtinIcons[a]} {builtinLabels[a]}
+                {builtinLabels[a]}
               </RowActionButton>
             ))}
             {customActions.length > 0 && actions.length > 0 && (
@@ -184,13 +185,14 @@ export function DataTableRowActions<TData>({
               .map((c) => (
                 <RowActionButton
                   key={c.id}
+                  icon={c.icon}
                   danger={c.danger}
                   onClick={() => {
                     setOpen(false)
                     onAction?.(c.id, row)
                   }}
                 >
-                  {c.icon} {c.label}
+                  {c.label}
                 </RowActionButton>
               ))}
           </div>,
@@ -201,10 +203,12 @@ export function DataTableRowActions<TData>({
 }
 
 function RowActionButton({
+  icon,
   children,
   danger,
   onClick,
 }: {
+  icon?: React.ReactNode
   children: React.ReactNode
   danger?: boolean
   onClick: () => void
@@ -214,11 +218,12 @@ function RowActionButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent",
+        "flex min-h-9 w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent",
         danger && "text-destructive hover:bg-destructive/10 hover:text-destructive"
       )}
     >
-      {children}
+      <span aria-hidden="true" className="grid size-[1em] shrink-0 place-items-center [&_svg]:size-full">{icon}</span>
+      <span>{children}</span>
     </button>
   )
 }
